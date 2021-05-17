@@ -28,6 +28,12 @@ executable Kuifje-compiler
     -- Kuifje.TypeChecker
     Kuifje.Value
   -- other-extensions:
-  build-depends:       base >=4.11 && <4.12, lens >=4.17 && <4.18, kuifje >=0.1 && <0.2, parsec >=3.1 && <3.2, boxes >=0.1 && < 0.2, containers >=0.5 && < 0.7
+  build-depends:
+    base >=4.11,
+    lens >=4.17,
+    kuifje >=0.1,
+    parsec >=3.1,
+    boxes >=0.1,
+    containers >=0.5
   -- hs-source-dirs:      src
   default-language:    Haskell2010

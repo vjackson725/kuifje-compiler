@@ -1,0 +1,3 @@
+[submodule "kuifje-semantics"]
+	path = kuifje-shallow
+	url = https://github.com/vjackson725/kuifje-semantics
