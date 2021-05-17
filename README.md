@@ -4,7 +4,7 @@ An imperative language for quantitative information flow.
 ## Usage
 To run the file, you can use cabal. For example, you can run `Examples\BiasCoin.kf` by using 
 ```
-cabal run Examples\BiasCoin.kf
+cabal run Kuifje-compiler Examples\BiasCoin.kf
 ```
 ## Syntax 
 coming soon
