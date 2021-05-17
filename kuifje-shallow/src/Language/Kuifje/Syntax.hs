@@ -5,8 +5,6 @@
 
 module Language.Kuifje.Syntax where
 
-import Data.Semigroup
-
 import Language.Kuifje.Distribution
 
 -- | Kleisli arrow.
