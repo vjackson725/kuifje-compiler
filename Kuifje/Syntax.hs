@@ -31,7 +31,9 @@ data Expr = Var String
           | Neg Expr 
           | ABinary ABinOp Expr Expr 
           | Ichoice Expr Expr Expr   -- (Expr Expr Prob)
-          | Ichoices [Expr] 
+          | Ichoices [Expr]
+          | Tuple Expr Expr
+          | INUchoices [Expr]
           | SetIchoice Expr
 
           -- Bool Expr

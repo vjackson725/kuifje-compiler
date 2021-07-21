@@ -50,7 +50,6 @@ languageDef =
                                       , "observe"
                                       , "uniform"
                                       , "|"
-                                      , "@"
                                       ]
 
             , Token.reservedOpNames = ["+"
@@ -70,6 +69,7 @@ languageDef =
                                       , "&&"
                                       , "||"
                                       , "%"
+                                      , "@"
                                       ]
             }
 
@@ -206,7 +206,8 @@ eOperators =
         , [Infix  (reservedOp ">="  >> return (RBinary Ge)      ) AssocLeft] 
         , [Infix  (reservedOp "<="  >> return (RBinary Le)      ) AssocLeft] 
         , [Infix  (reservedOp "=="  >> return (RBinary Eq)      ) AssocLeft] 
-        , [Infix  (reservedOp "!="  >> return (RBinary Ne)      ) AssocLeft] 
+        , [Infix  (reservedOp "!="  >> return (RBinary Ne)      ) AssocLeft]
+        , [Infix  (reservedOp "@"   >> return Tuple             ) AssocLeft] 
         ]
 
 eTerm :: Parser Expr
@@ -218,7 +219,8 @@ eTerm = (parens expression
         <|> try uniformFromSet
         <|> try uniformIchoices
         <|> try uniformSetVar
-        <|> uniformIchoicesListComp
+        <|> try uniformIchoicesListComp
+        <|> notUniformIchoices
         <|> (liftM RationalConst (try decimalRat) <?> "rat")
         <|> (liftM Var identifier <?> "var")
         <?> "eTerm") << whiteSpace
@@ -240,6 +242,12 @@ uniformIchoices =
            list <- sepBy expression (symbol ",")
            reservedOp "]"
            return $ Ichoices list
+
+notUniformIchoices = 
+        do reservedOp "["
+           list <- sepBy expression (symbol ",")
+           reservedOp "]"
+           return $ INUchoices list
 
 uniformIchoicesListComp = 
         do reserved "uniform"

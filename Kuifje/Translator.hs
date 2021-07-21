@@ -94,6 +94,19 @@ evalE (Ichoices ls) =
                           (head ls) 
                           (Ichoices (tail ls)) 
                           (RationalConst (1 % (toInteger (length ls))))
+evalE (Tuple e p) = \s ->
+  let e' = (evalE e) s
+      p' = Data.List.foldr (\x y -> case x of (R x', q) -> x'*q*y) 1
+              $ toList $ runD $ (evalE p) s
+      d = D $ Data.Map.Strict.map (*p') $ runD e'
+   in D $ (runD d)
+evalE (INUchoices ls) = 
+  if length ls == 1
+     then evalE $ head ls
+     else \s ->
+        let e1' = (evalE $ head ls) s
+            e2' = (evalE $ INUchoices (tail ls)) s
+         in D $ unionWith (+) (runD e1') (runD e2')
 evalE (BoolConst b) = \s -> return (B b)
 evalE (Not b) = \s -> 
         let r' = (evalE b) s 
