@@ -1,0 +1,6 @@
+prob := (1 [1/2] 2);
+x := switch prob then
+    case 1:: (1 [1/2] 2)
+    case 2:: (2 [2/3] 3)
+break;
+leak x;

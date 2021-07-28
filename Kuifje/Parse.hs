@@ -50,6 +50,9 @@ languageDef =
                                       , "observe"
                                       , "uniform"
                                       , "|"
+                                      , "switch"
+                                      , "case"
+                                      , "break"
                                       ]
 
             , Token.reservedOpNames = ["+"
@@ -70,6 +73,7 @@ languageDef =
                                       , "||"
                                       , "%"
                                       , "@"
+                                      , "::"
                                       ]
             }
 
@@ -207,7 +211,8 @@ eOperators =
         , [Infix  (reservedOp "<="  >> return (RBinary Le)      ) AssocLeft] 
         , [Infix  (reservedOp "=="  >> return (RBinary Eq)      ) AssocLeft] 
         , [Infix  (reservedOp "!="  >> return (RBinary Ne)      ) AssocLeft]
-        , [Infix  (reservedOp "@"   >> return Tuple             ) AssocLeft] 
+        , [Infix  (reservedOp "@"   >> return Tuple             ) AssocLeft]
+        , [Infix  (reservedOp "::"  >> return Case              ) AssocLeft] 
         ]
 
 eTerm :: Parser Expr
@@ -220,7 +225,8 @@ eTerm = (parens expression
         <|> try uniformIchoices
         <|> try uniformSetVar
         <|> try uniformIchoicesListComp
-        <|> notUniformIchoices
+        <|> try notUniformIchoices
+        <|> switchExpr
         <|> (liftM RationalConst (try decimalRat) <?> "rat")
         <|> (liftM Var identifier <?> "var")
         <?> "eTerm") << whiteSpace
@@ -235,6 +241,16 @@ ifExpr =
      reserved "fi"
      return $ ExprIf cond expr1 expr2
    <?> "if-expr"
+
+switchExpr =
+  do reserved "switch"
+     var <- expression
+     reserved "then"
+     reserved "case"
+     list <- sepBy expression (symbol "case")
+     reserved "break"
+     return $ ExprSwitch var list
+  <?> "switch-expr"
 
 uniformIchoices = 
         do reserved "uniform"

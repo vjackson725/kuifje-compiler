@@ -45,6 +45,8 @@ data Expr = Var String
           -- Extension
           | ExprIf Expr Expr Expr
           | Eset (Set Expr)
+          | Case Expr Expr
+          | ExprSwitch Expr [Expr]
           deriving (Show, Eq, Ord)
 
 data ABinOp = Add 

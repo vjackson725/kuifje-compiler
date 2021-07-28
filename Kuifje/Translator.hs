@@ -146,6 +146,29 @@ evalE (SetIchoice e) = \s ->
                                         | elem <- DSET.toList set] 
                                         | (S set, p) <- toList (runD d)]
          in D $ fromListWith (+) resultList
+evalE (ExprSwitch var ls) = 
+  if length ls == 1
+      then evalE $ head ls
+      else \s ->
+         let val = head (evalCase (head ls))
+             e1 = head (tail (evalCase (head ls)))
+             cond = ((RBinary Eq) var val)
+             cond' = runD $ (evalE cond) s
+             e1' = (evalE e1) s
+             e2' = (evalE $ ExprSwitch var (tail ls)) s
+             d1 = case Data.Map.Strict.lookup (B True) cond' of
+                    (Just p)  -> D $ Data.Map.Strict.map (*p) $ runD e1'
+                    otherwise -> D $ Data.Map.Strict.empty
+             d2 = case Data.Map.Strict.lookup (B False) cond' of
+                    (Just p)  -> D $ Data.Map.Strict.map (*p) $ runD e2'
+                    otherwise -> D $ Data.Map.Strict.empty
+             in D $ unionWith (+) (runD d1) (runD d2)
+evalE (Case val e) =
+  evalE $ e
+
+evalCase :: Expr -> [Expr]
+evalCase (Case val e) = 
+  [val, e]
 
 translateKuifje :: Stmt -> Kuifje Gamma 
 translateKuifje (Seq []) = skip
