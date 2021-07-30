@@ -52,6 +52,7 @@ languageDef =
                                       , "|"
                                       , "switch"
                                       , "case"
+                                      , "default"
                                       , "break"
                                       ]
 
@@ -248,8 +249,10 @@ switchExpr =
      reserved "then"
      reserved "case"
      list <- sepBy expression (symbol "case")
+     reserved "default"
+     def <- expression
      reserved "break"
-     return $ ExprSwitch var list
+     return $ ExprSwitch var list def
   <?> "switch-expr"
 
 uniformIchoices = 

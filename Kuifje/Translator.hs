@@ -146,16 +146,16 @@ evalE (SetIchoice e) = \s ->
                                         | elem <- DSET.toList set] 
                                         | (S set, p) <- toList (runD d)]
          in D $ fromListWith (+) resultList
-evalE (ExprSwitch var ls) = 
-  if length ls == 1
-      then evalE $ head ls
+evalE (ExprSwitch var ls def) = 
+  if length ls == 0
+      then evalE $ def
       else \s ->
          let val = head (evalCase (head ls))
              e1 = head (tail (evalCase (head ls)))
              cond = ((RBinary Eq) var val)
              cond' = runD $ (evalE cond) s
              e1' = (evalE e1) s
-             e2' = (evalE $ ExprSwitch var (tail ls)) s
+             e2' = (evalE $ ExprSwitch var (tail ls) def) s
              d1 = case Data.Map.Strict.lookup (B True) cond' of
                     (Just p)  -> D $ Data.Map.Strict.map (*p) $ runD e1'
                     otherwise -> D $ Data.Map.Strict.empty
