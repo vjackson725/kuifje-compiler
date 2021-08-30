@@ -140,3 +140,9 @@ exprCheck g (Eset s) =
            if all (== headType) (Data.List.map (exprCheck g) $ tail ls) 
               then return $ SetOf ty
               else typeError TypeMismatch
+exprCheck g (Case val e1) =
+        do val'  <- exprCheck val c
+           e1' <- exprCheck g e1
+           if val' != typeError && e1' == RationalType
+              then return e1'
+              else typeError TypeMismatch

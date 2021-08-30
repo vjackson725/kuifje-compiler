@@ -135,9 +135,11 @@ sOperators =
 
 sTerm :: Parser Stmt
 sTerm = (braces statements
+         <|> caseStmt
          <|> assignStmt
          <|> ifStmt
          <|> whileStmt
+         <|> switchStmt
          <|> skipStmt
          <|> vidStmt
          <|> leakStmt) << whiteSpace
@@ -152,6 +154,25 @@ ifStmt =
      stmt2 <- statements
      reserved "fi"
      return $ If cond stmt1 stmt2
+
+caseStmt :: Parser Stmt
+caseStmt =
+  do val  <- integer
+     reserved "::"
+     stmt <- statements
+     return $ CaseStmt (RationalConst (val % 1)) stmt
+
+switchStmt :: Parser Stmt
+switchStmt =
+  do reserved "switch"
+     var  <- expression
+     reserved "then"
+     reserved "case"
+     list <- sepBy statements (symbol "case")
+     reserved "default"
+     def <- statements
+     reserved "break"
+     return $ Switch var list def
 
 whileStmt :: Parser Stmt
 whileStmt =

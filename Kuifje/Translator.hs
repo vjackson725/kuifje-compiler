@@ -58,7 +58,7 @@ bOperator op d1 d2 =
 evalE :: Expr -> (Gamma ~> Value)
 evalE (Var id) = \s -> case E.lookup s id of 
                           Just v -> (return v)
-                          otherwise -> error "Variable not in scope"
+                          otherwise -> error ("Variable " ++ id ++ " not in scope")
 evalE (RationalConst r) = \s -> return (R r)
 evalE (Neg r) = \s -> 
         let r' = (evalE r) s in 
@@ -173,9 +173,9 @@ evalCase (Case val e) =
 translateKuifje :: Stmt -> Kuifje Gamma 
 translateKuifje (Seq []) = skip
 translateKuifje (Seq ls) = translateKuifje (head ls) <> translateKuifje (Seq (tail ls))
-translateKuifje (Assign id expr) = Language.Kuifje.Syntax.update (\s -> 
+translateKuifje (Assign id expr) = Language.Kuifje.Syntax.update (\s ->
         let currS = (evalE expr) s in
-            fmap (\r -> E.add s (id, r)) currS)
+            fmap (\r -> E.add s (id, r)) currS) 
 translateKuifje (Kuifje.Syntax.While e s) = 
         Language.Kuifje.Syntax.while (\s -> 
                 let currS = (evalE e) s in 
@@ -194,6 +194,18 @@ translateKuifje (Echoice s1 s2 p) =
                   in (fmap (\r -> case r of (B b) -> b)) p') 
           (translateKuifje s1) 
           (translateKuifje s2)
+translateKuifje (CaseStmt exp stmt) =
+          translateKuifje stmt
+translateKuifje (Switch var list def) =
+        if length list == 0
+        then (translateKuifje def)
+        else Language.Kuifje.Syntax.cond
+          (\s -> let currS = (evalE ((RBinary Eq) var (evalCaseStmt (head list)))) s in fmap (\r -> case r of (B b) -> b) currS)
+          (translateKuifje (head list))
+          (translateKuifje (Switch var (tail list) def))
+
+evalCaseStmt :: Stmt -> Expr
+evalCaseStmt (CaseStmt exp stmt) = exp
 
 getRational :: Gamma -> String -> Rational
 getRational g s | Just (R t) <- E.lookup g s = t

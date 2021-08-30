@@ -58,10 +58,12 @@ data ABinOp = Add
             | Rem
             deriving (Show, Ord, Eq)
 
-data Stmt = Seq [Stmt] 
+data Stmt = Seq [Stmt]
           | Assign String Expr
           | If Expr Stmt Stmt 
-          | While Expr Stmt 
+          | While Expr Stmt
+          | Switch Expr [Stmt] Stmt
+          | CaseStmt Expr Stmt
           | Skip 
           | Leak Expr
           | Vis String
