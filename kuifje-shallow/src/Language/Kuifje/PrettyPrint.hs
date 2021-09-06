@@ -1,52 +1,67 @@
+{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
+
 module Language.Kuifje.PrettyPrint where
 
-import Data.List (transpose)
-import Text.PrettyPrint.Boxes
-import qualified Data.Map.Strict as HM (mapWithKey, elems)
+import Data.List (transpose, intersperse)
+import qualified Text.PrettyPrint.Boxes as PP
+import qualified Data.Map.Strict as HM
+
+import Debug.Trace
 
 import Language.Kuifje.Distribution
 
+import Numeric
+
 class Boxable a where
-  toBox :: a -> Box
+  toBox :: a -> PP.Box
+
 
 instance Boxable Bool where
-  toBox b = text (show b)
+  toBox = PP.text . show
 
 instance Boxable Integer where
-  toBox i = text (show i)
+  toBox = PP.text . show
 
 instance Boxable Int where
-  toBox i = text (show i)
+  toBox = PP.text . show
 
-instance Show a => Boxable [a] where
-  toBox = text . show
+instance Boxable Rational where
+  toBox = PP.text . show . fromRat
+
+instance Boxable a => Boxable [a] where
+  toBox xs =
+    let vs = map toBox xs
+    in PP.text "[" PP.<+>
+       boxmiddle vs PP.<+>
+       PP.text "]"
+    where
+      boxmiddle ([b]) = b
+      boxmiddle (b : bs) = b PP.<> PP.text "," PP.<+> boxmiddle bs
+      boxmiddle [] = PP.text ""
 
 instance (Show a, Show b) => Boxable (a,b) where
-  toBox p  =  text (show p)
+  toBox = PP.text . show
 
 instance (Show a, Show b, Show c) => Boxable (a,b,c) where
-  toBox p  =  text (show p)
+  toBox = PP.text . show
 
 instance (Show a, Show b, Show c, Show d) => Boxable (a,b,c,d) where
-  toBox p  =  text (show p)
+  toBox = PP.text . show
 
-distToBox :: (Ord a, Boxable a) => Dist a -> Box
-distToBox d = tabulate $ HM.elems (HM.mapWithKey lambdaPrint (unpackD d))
-                where lambdaPrint e p = [text (show p), toBox e]
+distToBox :: (Ord a, Boxable a) => Dist a -> PP.Box
+distToBox =
+  tabulate . map (\(a,b) -> [toBox b, toBox a]) . HM.toList . unpackD
 
 instance (Boxable a, Ord a) => Boxable (Dist a) where
   toBox = distToBox
 
-instance (Ord a, Boxable a) => Show (Dist a) where
-  show = render . distToBox
-
-tabulate :: [[Box]] -> Box
+tabulate :: [[PP.Box]] -> PP.Box
 tabulate rs = table
   where
-   heights  = map (maximum . map rows) rs
-   rs''     = zipWith (\r h -> map (alignVert top h) r) rs heights
+   heights  = map (maximum . map PP.rows) rs
+   rs''     = zipWith (\r h -> map (PP.alignVert PP.top h) r) rs heights
    columns  = transpose rs''
-   widths   = map (maximum . map cols) columns
-   rs'      = transpose (zipWith (\c w -> map (alignHoriz left w) c) columns widths)
-   columns' = map (hsep 3 top) rs'
-   table    = vsep 0 left columns'
+   widths   = map (maximum . map PP.cols) columns
+   rs'      = transpose $ zipWith (\c w -> map (PP.alignHoriz PP.left w) c) columns widths
+   columns' = map (PP.hsep 3 PP.top) rs'
+   table    = PP.vsep 0 PP.left columns'
