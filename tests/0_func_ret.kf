@@ -1,4 +1,4 @@
-function f1 (Dist: a, Dist: b, Set: c) (Dist: x) fun
+function f1 (dist: a, dist: b, set: c) (dist: x) fun
   x := uniform c;
   if x == 1 then
     x := a;
@@ -10,5 +10,5 @@ aa := uniform [1..3];
 b := (2 [3/4] 3);
 ss := Set {0, 1};
 
-f1 (aa, b, ss) (ret);
+call f1 (aa, b, ss) (ret);
 leak ret;

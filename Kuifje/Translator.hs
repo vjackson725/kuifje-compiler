@@ -56,7 +56,7 @@ bOperator op d1 d2 =
                                                 (B y, q) <- toList $ runD d2]
 
 evalE :: Expr -> (Gamma ~> Value)
-evalE (Var id) = \s -> case E.lookup s id of 
+evalE (Var id) = \s -> case E.lookup s ("__global__",id) of 
                           Just v -> (return v)
                           otherwise -> error ("Variable " ++ id ++ " not in scope")
 evalE (RationalConst r) = \s -> return (R r)
@@ -175,7 +175,7 @@ translateKuifje (Seq []) = skip
 translateKuifje (Seq ls) = translateKuifje (head ls) <> translateKuifje (Seq (tail ls))
 translateKuifje (Assign id expr) = Language.Kuifje.Syntax.update (\s ->
         let currS = (evalE expr) s in
-            fmap (\r -> E.add s (id, r)) currS) 
+            fmap (\r -> E.add s ("__global__",id, r)) currS) 
 translateKuifje (Kuifje.Syntax.While e s) = 
         Language.Kuifje.Syntax.while (\s -> 
                 let currS = (evalE e) s in 
@@ -208,15 +208,15 @@ evalCaseStmt :: Stmt -> Expr
 evalCaseStmt (CaseStmt exp stmt) = exp
 
 getRational :: Gamma -> String -> Rational
-getRational g s | Just (R t) <- E.lookup g s = t
+getRational g s | Just (R t) <- E.lookup g ("__global__",s) = t
                 | otherwise = error ("Not going to happen " ++ s)
 
 project :: Dist (Dist Gamma) -> Dist (Dist Rational)
 project = fmap (fmap (\s -> getRational s "y"))
 
 initGamma :: Rational -> Rational -> Gamma
-initGamma x y = let g = E.add E.empty ("x", (R x)) in 
-               E.add g ("y", (R y))
+initGamma x y = let g = E.add E.empty ("__global__","x", (R x)) in 
+               E.add g ("__global__","y", (R y))
 
 hyper :: Dist (Dist Rational)
 hyper = let g = translateKuifje exampelS 

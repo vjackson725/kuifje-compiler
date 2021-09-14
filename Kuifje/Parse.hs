@@ -54,6 +54,11 @@ languageDef =
                                       , "case"
                                       , "default"
                                       , "break"
+--                                      , "function"
+--                                      , "dist"
+--                                      , "fun"
+--                                      , "nuf"
+--                                      , "call"
                                       ]
 
             , Token.reservedOpNames = ["+"

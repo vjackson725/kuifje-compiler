@@ -1,4 +1,4 @@
-function f2 (Dist: a, Dist: b) fun
+function f2 (dist: a, dist: b) fun
   if a == b then
     leak a;
   else
@@ -8,4 +8,4 @@ nuf;
 aa := uniform [1..3];
 b := (2 [3/4] 3);
 
-f2 (aa, b);
+call f2 (aa, b);

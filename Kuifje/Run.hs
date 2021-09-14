@@ -14,7 +14,7 @@ import Language.Kuifje.Syntax
 import Prelude hiding ((!!), fmap, (>>=))
 import qualified Kuifje.Env as E
 
-getFrom g s | Just x <- E.lookup g s = x
+getFrom g s | Just x <- E.lookup g ("__global__",s) = x
             | otherwise = error ("Not going to happend " ++ s)
             
 project :: String -> Dist (Dist Gamma) -> Dist (Dist Value)
