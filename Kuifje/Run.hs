@@ -13,15 +13,17 @@ import Language.Kuifje.Semantics
 import Language.Kuifje.Syntax
 import Prelude hiding ((!!), fmap, (>>=))
 import qualified Kuifje.Env as E
+import qualified Data.Map as Map
 
-getFrom g s | Just x <- E.lookup g ("__global__",s) = x
+getFrom g s | Just x <- E.lookup g s = x
             | otherwise = error ("Not going to happend " ++ s)
             
 project :: String -> Dist (Dist Gamma) -> Dist (Dist Value)
 project var = fmap (fmap (\s -> getFrom s var))
 
-runHyper s = do tmp <- parseFile s
-                let g = translateKuifje tmp
+runHyper s = do tmp <- parseFile s 
+                let m = Map.empty
+                let g = fst (translateKuifje tmp m)
                 let kuifje = hysem g (uniform [E.empty])
                 let (env, _) = (toList $ runD kuifje) !! 0
                 let (gamma, _) = ((toList $ runD $ env) !! 0)

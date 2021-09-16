@@ -4,6 +4,7 @@
 module Kuifje.Translator where 
 
 import qualified Kuifje.Env as E
+import qualified Data.Map as Map
 import Kuifje.Value
 import Kuifje.Parse
 import Kuifje.Syntax 
@@ -56,7 +57,7 @@ bOperator op d1 d2 =
                                                 (B y, q) <- toList $ runD d2]
 
 evalE :: Expr -> (Gamma ~> Value)
-evalE (Var id) = \s -> case E.lookup s ("__global__",id) of 
+evalE (Var id) = \s -> case E.lookup s id of 
                           Just v -> (return v)
                           otherwise -> error ("Variable " ++ id ++ " not in scope")
 evalE (RationalConst r) = \s -> return (R r)
@@ -170,56 +171,71 @@ evalCase :: Expr -> [Expr]
 evalCase (Case val e) = 
   [val, e]
 
-translateKuifje :: Stmt -> Kuifje Gamma 
-translateKuifje (Seq []) = skip
-translateKuifje (Seq ls) = translateKuifje (head ls) <> translateKuifje (Seq (tail ls))
-translateKuifje (Assign id expr) = Language.Kuifje.Syntax.update (\s ->
+translateKuifje :: Stmt -> Map.Map String Stmt -> (Kuifje Gamma, Map.Map String Stmt)
+translateKuifje (Seq []) fBody = (skip, fBody)
+translateKuifje (Seq ls) fBody = 
+        let (hdRes, newFBody) = (translateKuifje (head ls) fBody)
+        in (hdRes, newFBody) <> translateKuifje (Seq (tail ls)) newFBody
+translateKuifje (Assign id expr) fBody = (Language.Kuifje.Syntax.update (\s ->
         let currS = (evalE expr) s in
-            fmap (\r -> E.add s ("__global__",id, r)) currS) 
-translateKuifje (Kuifje.Syntax.While e s) = 
-        Language.Kuifje.Syntax.while (\s -> 
+            fmap (\r -> E.add s (id, r)) currS), fBody)
+translateKuifje (Kuifje.Syntax.While e s) fBody = 
+        (Language.Kuifje.Syntax.while (\s -> 
                 let currS = (evalE e) s in 
-                    fmap (\r -> case r of (B b) -> b) currS) (translateKuifje s)
-translateKuifje (Kuifje.Syntax.If e s1 s2) = 
-        Language.Kuifje.Syntax.cond 
+                    fmap (\r -> case r of (B b) -> b) currS) (fst (translateKuifje s fBody)), fBody)
+translateKuifje (Kuifje.Syntax.If e s1 s2) fBody = 
+        (Language.Kuifje.Syntax.cond 
           (\s -> let currS = (evalE e) s in fmap (\r -> case r of (B b) -> b) currS) 
-          (translateKuifje s1) 
-          (translateKuifje s2)
-translateKuifje Kuifje.Syntax.Skip = skip
-translateKuifje (Leak e) = observe (evalE e)
-translateKuifje (Vis s) = undefined
-translateKuifje (Echoice s1 s2 p) = 
-        Language.Kuifje.Syntax.cond 
+          (fst (translateKuifje s1 fBody)) 
+          (fst (translateKuifje s2 fBody)), fBody)
+translateKuifje Kuifje.Syntax.Skip fBody = (skip, fBody)
+translateKuifje (Leak e) fBody = (observe (evalE e), fBody)
+translateKuifje (Vis s) fBody = (undefined, fBody)
+translateKuifje (Echoice s1 s2 p) fBody = 
+         (Language.Kuifje.Syntax.cond 
           (\s -> let p' = (evalE (Ichoice (BoolConst True) (BoolConst False) p) s) 
                   in (fmap (\r -> case r of (B b) -> b)) p') 
-          (translateKuifje s1) 
-          (translateKuifje s2)
-translateKuifje (CaseStmt exp stmt) =
-          translateKuifje stmt
-translateKuifje (Switch var list def) =
+          (fst (translateKuifje s1  fBody)) 
+          (fst (translateKuifje s2 fBody)), fBody)
+translateKuifje (CaseStmt exp stmt) fBody =
+          translateKuifje stmt fBody
+translateKuifje (Switch var list def) fBody =
         if length list == 0
-        then (translateKuifje def)
-        else Language.Kuifje.Syntax.cond
+        then (translateKuifje def fBody)
+        else (Language.Kuifje.Syntax.cond
           (\s -> let currS = (evalE ((RBinary Eq) var (evalCaseStmt (head list)))) s in fmap (\r -> case r of (B b) -> b) currS)
-          (translateKuifje (head list))
-          (translateKuifje (Switch var (tail list) def))
+          (fst (translateKuifje (head list) fBody))
+          (fst (translateKuifje (Switch var (tail list) def) fBody)), fBody)
+translateKuifje (FuncStmt name body) fBody = 
+          let nMap = Map.insert name body fBody 
+              stmt = fst (translateKuifje (Kuifje.Syntax.Skip) fBody)
+          in (stmt, nMap)
+translateKuifje (CallStmt name) fBody =
+        translateKuifje (getFuncBody name fBody) fBody
+
+fromJust :: Maybe Stmt -> Stmt
+fromJust (Just a) = a
+fromJust Nothing = error "Function not found."
+
+getFuncBody :: String -> (Map.Map String Stmt) -> Stmt
+getFuncBody id funcBody = fromJust (Map.lookup id funcBody)
 
 evalCaseStmt :: Stmt -> Expr
 evalCaseStmt (CaseStmt exp stmt) = exp
 
 getRational :: Gamma -> String -> Rational
-getRational g s | Just (R t) <- E.lookup g ("__global__",s) = t
+getRational g s | Just (R t) <- E.lookup g s = t
                 | otherwise = error ("Not going to happen " ++ s)
 
 project :: Dist (Dist Gamma) -> Dist (Dist Rational)
 project = fmap (fmap (\s -> getRational s "y"))
 
 initGamma :: Rational -> Rational -> Gamma
-initGamma x y = let g = E.add E.empty ("__global__","x", (R x)) in 
-               E.add g ("__global__","y", (R y))
+initGamma x y = let g = E.add E.empty ("x", (R x)) in 
+               E.add g ("y", (R y))
 
 hyper :: Dist (Dist Rational)
-hyper = let g = translateKuifje exampelS 
+hyper = let g = fst (translateKuifje exampelS Map.empty)
          in project $ hysem g (uniform [E.empty])
 
 example :: String

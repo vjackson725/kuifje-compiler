@@ -54,11 +54,11 @@ languageDef =
                                       , "case"
                                       , "default"
                                       , "break"
---                                      , "function"
---                                      , "dist"
---                                      , "fun"
---                                      , "nuf"
---                                      , "call"
+                                      , "function"
+                                      , "dist"
+                                      , "fun"
+                                      , "nuf"
+                                      , "call"
                                       ]
 
             , Token.reservedOpNames = ["+"
@@ -140,11 +140,13 @@ sOperators =
 
 sTerm :: Parser Stmt
 sTerm = (braces statements
+         <|> funcStmt
          <|> caseStmt
          <|> assignStmt
          <|> ifStmt
          <|> whileStmt
          <|> switchStmt
+         <|> callStmt
          <|> skipStmt
          <|> vidStmt
          <|> leakStmt) << whiteSpace
@@ -159,6 +161,21 @@ ifStmt =
      stmt2 <- statements
      reserved "fi"
      return $ If cond stmt1 stmt2
+
+funcStmt :: Parser Stmt
+funcStmt = 
+  do reserved "function"
+     name <- identifier
+     reserved "fun"
+     body <- statements
+     reserved "nuf"
+     return $ FuncStmt name body
+
+callStmt :: Parser Stmt
+callStmt =
+  do reserved "call"
+     name <- identifier
+     return $ CallStmt name
 
 caseStmt :: Parser Stmt
 caseStmt =

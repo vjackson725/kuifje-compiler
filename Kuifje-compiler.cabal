@@ -34,6 +34,7 @@ executable Kuifje-compiler
     kuifje >=0.1,
     parsec >=3.1,
     boxes >=0.1,
-    containers >=0.5
+    containers >=0.5,
+    mtl >=2.2.2
   -- hs-source-dirs:      src
   default-language:    Haskell2010

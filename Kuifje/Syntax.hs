@@ -62,6 +62,8 @@ data Stmt = Seq [Stmt]
           | Assign String Expr
           | If Expr Stmt Stmt 
           | While Expr Stmt
+          | FuncStmt String Stmt
+          | CallStmt String
           | Switch Expr [Stmt] Stmt
           | CaseStmt Expr Stmt
           | Skip 
