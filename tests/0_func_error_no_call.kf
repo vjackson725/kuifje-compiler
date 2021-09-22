@@ -1,7 +1,7 @@
 prob := (1 [1/3] 2);
 
-function f1 fun
-  x := prob;
+function f1 a returns b fun
+  b := a;
 nuf;
 
-leak x;
+leak b;

@@ -55,10 +55,10 @@ languageDef =
                                       , "default"
                                       , "break"
                                       , "function"
-                                      , "dist"
                                       , "fun"
                                       , "nuf"
                                       , "call"
+                                      , "returns"
                                       ]
 
             , Token.reservedOpNames = ["+"
@@ -143,10 +143,10 @@ sTerm = (braces statements
          <|> funcStmt
          <|> caseStmt
          <|> assignStmt
+         <|> callStmt
          <|> ifStmt
          <|> whileStmt
          <|> switchStmt
-         <|> callStmt
          <|> skipStmt
          <|> vidStmt
          <|> leakStmt) << whiteSpace
@@ -166,16 +166,22 @@ funcStmt :: Parser Stmt
 funcStmt = 
   do reserved "function"
      name <- identifier
+     inputs <- sepBy identifier (symbol ",")
+     reserved "returns"
+     outputs <- sepBy expression (symbol ",")
      reserved "fun"
      body <- statements
      reserved "nuf"
-     return $ FuncStmt name body
+     return $ FuncStmt name body inputs outputs
 
 callStmt :: Parser Stmt
 callStmt =
   do reserved "call"
      name <- identifier
-     return $ CallStmt name
+     inputs <- sepBy expression (symbol ",")
+     reserved "returns"
+     outputs <- sepBy identifier (symbol ",")
+     return $ CallStmt name inputs outputs
 
 caseStmt :: Parser Stmt
 caseStmt =

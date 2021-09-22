@@ -171,7 +171,7 @@ evalCase :: Expr -> [Expr]
 evalCase (Case val e) = 
   [val, e]
 
-translateKuifje :: Stmt -> Map.Map String Stmt -> (Kuifje Gamma, Map.Map String Stmt)
+translateKuifje :: Stmt -> Map.Map String (Stmt, [String], [Expr]) -> (Kuifje Gamma, Map.Map String (Stmt, [String], [Expr]) )
 translateKuifje (Seq []) fBody = (skip, fBody)
 translateKuifje (Seq ls) fBody = 
         let (hdRes, newFBody) = (translateKuifje (head ls) fBody)
@@ -206,18 +206,159 @@ translateKuifje (Switch var list def) fBody =
           (\s -> let currS = (evalE ((RBinary Eq) var (evalCaseStmt (head list)))) s in fmap (\r -> case r of (B b) -> b) currS)
           (fst (translateKuifje (head list) fBody))
           (fst (translateKuifje (Switch var (tail list) def) fBody)), fBody)
-translateKuifje (FuncStmt name body) fBody = 
-          let nMap = Map.insert name body fBody 
+translateKuifje (FuncStmt name body lInput lOutput) fBody = 
+          let nMap = Map.insert name (body, lInput, lOutput) fBody 
               stmt = fst (translateKuifje (Kuifje.Syntax.Skip) fBody)
           in (stmt, nMap)
-translateKuifje (CallStmt name) fBody =
-        translateKuifje (getFuncBody name fBody) fBody
+translateKuifje (CallStmt name lInput lOutput) fBody =
+          let base = (getFuncBody name fBody)
+              baseStmt = fst3 base
+              fInput = snd3 base
+              fOutput = trd3 base
+              baseUpdated = updateStmtUses name baseStmt
+              outCntxStmt = addOutputCntx name fOutput lOutput baseUpdated
+              inCntxStmt = addInputCntx name fInput lInput outCntxStmt
+          in translateKuifje inCntxStmt fBody
+--         error ("Cntx is " ++ (show inCntxStmt))
+--       translateKuifje (fst3 (getFuncBody name fBody)) fBody
 
-fromJust :: Maybe Stmt -> Stmt
+addInputCntx :: String -> [String] -> [Expr] -> Stmt -> Stmt
+addInputCntx fName [] [] stmt = stmt
+addInputCntx fName [] _  stmt = error ("Invalid Call to " ++ fName)
+addInputCntx fName _  [] stmt = error ("Invalid Call to " ++ fName)
+addInputCntx fName fInputs cInputs stmt = 
+        let id = (fName ++ "." ++ (head fInputs))
+            expr = (head cInputs)
+            nAssngStmt = (Assign id expr)
+            nStmt = (appendStmtBegin nAssngStmt stmt)
+        in (addInputCntx fName (tail fInputs) (tail cInputs) nStmt)
+
+addOutputCntx :: String -> [Expr] -> [String] -> Stmt -> Stmt
+addOutputCntx fName [] [] stmt = stmt
+addOutputCntx fName [] _  stmt = error ("Invalid Call to " ++ fName)
+addOutputCntx fName _  [] stmt = error ("Invalid Call to " ++ fName)
+addOutputCntx fName fOutputs cOutputs stmt =
+        let id = (head cOutputs)
+            expr = (updateVarToCntx fName (head fOutputs))
+            nAssngStmt = (Assign id expr)
+            nStmt = (appendStmtEnd nAssngStmt stmt)
+        in (addOutputCntx fName (tail fOutputs) (tail cOutputs) nStmt)
+
+appendStmtBegin :: Stmt -> Stmt -> Stmt
+appendStmtBegin st1 (Seq ls) = (Seq (st1 : ls))
+appendStmtBegin st1 stmt = (Seq [st1, stmt])
+
+appendStmtEnd :: Stmt -> Stmt -> Stmt
+appendStmtEnd st1 (Seq ls) = (Seq (ls ++ [st1]))
+appendStmtEnd st1 stmt = (Seq [stmt, st1])
+
+updateVarToCntx :: String -> Expr -> Expr
+updateVarToCntx fName (Var id) = (Var (fName ++ "." ++ id))
+-- (addOutputCntx fName (tail fOutputs) (tail cOutputs) nStmt)
+
+updateAssingment :: String -> Stmt -> Stmt
+updateAssingment fName (Assign id expr) = (Assign (fName ++ "." ++ id) expr)
+updateAssingment fName e = e
+
+updateExpression :: String -> Expr -> Expr
+updateExpression fName (Var id) = (Var (fName ++ "." ++ id))
+updateExpression fName (Neg r) =
+     let newr = (updateExpression fName r)
+     in (Neg newr)
+updateExpression fName (ExprIf cond e1 e2) =
+     let newcond = (updateExpression fName cond)
+         newe1 = (updateExpression fName e1)
+         newe2 = (updateExpression fName e2)
+     in (ExprIf newcond newe1 newe2)
+updateExpression fName (ABinary op e1 e2) =
+     let newe1 = (updateExpression fName e1)
+         newe2 = (updateExpression fName e2)
+     in (ABinary op newe1 newe2)
+updateExpression fName (Ichoice e1 e2 p) =
+     let newp = (updateExpression fName p)
+         newe1 = (updateExpression fName e1)
+         newe2 = (updateExpression fName e2)
+     in (Ichoice newe1 newe2 newp)
+updateExpression fName (Ichoices []) = (Ichoices [])
+updateExpression fName (Ichoices ls) =
+     let hd = (updateExpression fName (head ls))
+         tl = (updateExpression fName (Ichoices (tail ls)))
+         (Ichoices list) = tl
+     in (Ichoices (hd : list))
+updateExpression fName (Tuple e p) =
+     let newe = (updateExpression fName e)
+     in (Tuple newe p)
+updateExpression fName (INUchoices []) = (INUchoices [])
+updateExpression fName (INUchoices ls) =
+     let hd = (updateExpression fName (head ls))
+         tl = (updateExpression fName (INUchoices (tail ls)))
+         (INUchoices list) = tl
+     in (INUchoices (hd : list))
+updateExpression fName (BBinary op e1 e2) =
+     let newe1 = (updateExpression fName e1)
+         newe2 = (updateExpression fName e2)
+     in (BBinary op newe1 newe2)
+updateExpression fName (RBinary op e1 e2) =
+     let newe1 = (updateExpression fName e1)
+         newe2 = (updateExpression fName e2)
+     in (RBinary op newe1 newe2)
+-- Support to Set not provided.
+updateExpression fName (ExprSwitch var [] def) =
+     let newvar = (updateExpression fName var)
+     in (ExprSwitch newvar [] def)
+updateExpression fName (ExprSwitch var ls def) =
+     let hd = (updateExpression fName (head ls))
+         tl = (updateExpression fName (ExprSwitch var (tail ls) def))
+         (ExprSwitch newvar list newdef) = tl
+     in (ExprSwitch newvar (hd : list) newdef)
+updateExpression fName e = e
+
+updateStmtList :: String -> [Stmt] -> [Stmt]
+updateStmtList fName [] = []
+updateStmtList fName ls = (updateStmtUses fName (head ls)) : (updateStmtList fName (tail ls))
+
+updateStmtUses :: String -> Stmt -> Stmt
+updateStmtUses fName (Seq []) = (Seq [])
+updateStmtUses fName (Seq ls) =
+     let hd = (updateStmtUses fName (head ls))
+         tl = (updateStmtUses fName (Seq (tail ls)))
+         (Seq list) = tl
+     in (Seq (hd : list))
+updateStmtUses fName (Assign id expr) = 
+     let newexpr = (updateExpression fName expr)
+     in (updateAssingment fName (Assign id newexpr))
+updateStmtUses fName (Kuifje.Syntax.While e s) = 
+     (Kuifje.Syntax.While (updateExpression fName e) (updateStmtUses fName s)) 
+updateStmtUses fName (Kuifje.Syntax.If e s1 s2) =
+     (Kuifje.Syntax.If (updateExpression fName e) (updateStmtUses fName s1) (updateStmtUses fName s2))
+updateStmtUses fName (Leak e) = (Leak (updateExpression fName e))
+updateStmtUses fName (Echoice s1 s2 p) =
+     (Echoice (updateStmtUses fName s1) (updateStmtUses fName s2) (updateExpression fName p))
+updateStmtUses fName (CaseStmt exp stmt) =
+     (CaseStmt (updateExpression fName exp) (updateStmtUses fName stmt))
+updateStmtUses fName (Switch var [] def) =
+     (Switch (updateExpression fName var) [] (updateStmtUses fName def)) 
+updateStmtUses fName (Switch var ls def) =
+     let newVar = (updateExpression fName var)
+         newDef = (updateStmtUses fName  def)
+         newLs = (updateStmtList fName ls)
+     in (Switch newVar newLs newDef)
+updateStmtUses fName stmt = stmt
+
+fst3 :: (a, b, c) -> a
+fst3 (x, _, _) = x
+
+snd3 :: (a, b, c) -> b
+snd3 (_, x, _) = x
+
+trd3 :: (a, b, c) -> c
+trd3 (_, _, x) = x
+
+fromJust :: Maybe (Stmt, [String], [Expr]) -> (Stmt, [String], [Expr])
 fromJust (Just a) = a
 fromJust Nothing = error "Function not found."
 
-getFuncBody :: String -> (Map.Map String Stmt) -> Stmt
+getFuncBody :: String -> Map.Map String (Stmt, [String], [Expr]) -> (Stmt, [String], [Expr])
 getFuncBody id funcBody = fromJust (Map.lookup id funcBody)
 
 evalCaseStmt :: Stmt -> Expr
