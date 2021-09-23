@@ -24,7 +24,12 @@ source-repository head
   location: git://github.com/martonbognar/kuifje.git
 
 library
-  exposed-modules:     Language.Kuifje.Distribution, Language.Kuifje.PrettyPrint, Language.Kuifje.Semantics, Language.Kuifje.Syntax
+  exposed-modules:
+    Language.Kuifje.Distribution,
+    Language.Kuifje.PrettyPrint,
+    Language.Kuifje.Semantics,
+    Language.Kuifje.Syntax,
+    Language.Kuifje.ShallowConsts
   --other-modules:
   other-extensions:    TemplateHaskell, ExistentialQuantification, TypeOperators, TypeSynonymInstances, FlexibleInstances
   build-depends:

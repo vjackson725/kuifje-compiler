@@ -1,16 +1,20 @@
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 
 module Language.Kuifje.PrettyPrint where
 
 import Data.List (transpose, intersperse)
-import qualified Text.PrettyPrint.Boxes as PP
 import qualified Data.Map.Strict as HM
-
 import Debug.Trace
+import Text.Printf (printf)
 
-import Language.Kuifje.Distribution
-
+import qualified Text.PrettyPrint.Boxes as PP
 import Numeric
+
+import Language.Kuifje.Distribution (Dist, unpackD)
+import Language.Kuifje.ShallowConsts (decimalPrecision)
+
 
 class Boxable a where
   toBox :: a -> PP.Box
@@ -25,8 +29,13 @@ instance Boxable Integer where
 instance Boxable Int where
   toBox = PP.text . show
 
+rationalPrettyFormat =
+  if decimalPrecision < 0
+  then show
+  else printf ("%." ++ show decimalPrecision ++ "f") . (fromRat :: _ -> Double)
+
 instance Boxable Rational where
-  toBox = PP.text . show . fromRat
+  toBox = PP.text . rationalPrettyFormat
 
 instance Boxable a => Boxable [a] where
   toBox xs =
