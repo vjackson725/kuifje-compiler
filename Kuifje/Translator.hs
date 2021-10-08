@@ -16,6 +16,7 @@ import Data.Ratio
 import Data.Map.Strict
 import Data.List
 import qualified Data.Set as DSET
+import Numeric
 
 import Language.Kuifje.Distribution
 import Kuifje.PrettyPrint 
@@ -101,13 +102,27 @@ evalE (Tuple e p) = \s ->
               $ toList $ runD $ (evalE p) s
       d = D $ Data.Map.Strict.map (*p') $ runD e'
    in D $ (runD d)
-evalE (INUchoices ls) = 
-  if length ls == 1
-     then evalE $ head ls
-     else \s ->
-        let e1' = (evalE $ head ls) s
-            e2' = (evalE $ INUchoices (tail ls)) s
-         in D $ unionWith (+) (runD e1') (runD e2')
+--evalTList (Tuple _ p) = p
+--evalTList (INUchoices ls) =
+--  if length ls == 1
+--     then evalTList $ head ls
+--     else \s ->
+--        let e1' = (evalTList $ head ls) s
+--            e2' = (evalE $ INUchoices (tail ls)) s
+--         in e1' + e2'
+evalE (INUchoices ls) =
+  if (evalTList $ INUchoices ls) == 1.0
+     then evalNUList $ INUchoices ls
+     else error ("Probability adds up to: " ++ 
+          (show (evalTList $ INUchoices ls)) ++
+          " --> It should be 1.0" )
+--evalE (INUchoices ls) =
+--  if length ls == 1
+--     then evalE $ head ls
+--     else \s ->
+--        let e1' = (evalE $ head ls) s
+--            e2' = (evalE $ INUchoices (tail ls)) s
+--         in D $ unionWith (+) (runD e1') (runD e2')
 evalE (BoolConst b) = \s -> return (B b)
 evalE (Not b) = \s -> 
         let r' = (evalE b) s 
@@ -170,6 +185,29 @@ evalE (Case val e) =
 evalCase :: Expr -> [Expr]
 evalCase (Case val e) = 
   [val, e]
+
+evalTList :: Expr -> Double
+--error ("Value is " ++ (show p))
+evalTList (RationalConst a) = (fromRat a)
+evalTList (ABinary Divide a b) = 
+  let aVal = (evalTList $ a)
+      bVal = (evalTList $ b)
+  in ( aVal / bVal)
+evalTList (Tuple _ p) = evalTList $ p
+evalTList (INUchoices []) = 0.0
+evalTList (INUchoices ls) = 
+  let hd = (evalTList $ head ls)
+      tl = (evalTList $ INUchoices (tail ls))
+  in hd + tl
+
+evalNUList (INUchoices ls) =
+  if length ls == 1
+     then evalE $ head ls
+     else \s ->
+        let e1' = (evalE $ head ls) s
+            e2' = (evalNUList $ INUchoices (tail ls)) s
+         in D $ unionWith (+) (runD e1') (runD e2')
+
 
 translateKuifje :: Stmt -> Map.Map String (Stmt, [String], [Expr]) -> (Kuifje Gamma, Map.Map String (Stmt, [String], [Expr]) )
 translateKuifje (Seq []) fBody = (skip, fBody)
