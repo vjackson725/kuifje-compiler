@@ -1,9 +1,8 @@
 prob := (1 [1/3] 2);
 
-function f1 p returns y fun
+function f1 p returns y
   z := p + 1;
   y := z + 1;
-nuf;
 
 call f1 prob returns b;
 leak b;

@@ -16,6 +16,10 @@ import Text.Parsec.Char
 import Text.Parsec (ParsecT)
 import Text.ParserCombinators.Parsec.Expr
 import Text.ParserCombinators.Parsec.Language
+import qualified Text.Parsec.Indent as Indent
+import qualified Text.Parsec as ParsecCl
+import qualified Text.Parsec.Indent.Explicit as Explicit
+import qualified Text.Parsec.Indent.Internal as Internal
 import qualified Text.ParserCombinators.Parsec.Token as Token
 import Data.Functor.Identity
 
@@ -162,6 +166,43 @@ ifStmt =
      reserved "fi"
      return $ If cond stmt1 stmt2
 
+
+-- | Obtain the current indentation, to be used as a reference later.
+indentation :: Monad m => ParsecT s u m Internal.Indentation
+indentation = do
+    pos <- getPosition
+    return $! Internal.Indentation {Internal.iLine = sourceLine pos, Internal.iColumn = sourceColumn pos}
+
+-- | Verifies if the position is in the same block as the reference position
+isInBlock :: Internal.Indentation -> Internal.Indentation -> Bool
+isInBlock ref pos = (Internal.iColumn pos >= Internal.iColumn ref)
+--(Internal.iColumn pos == Internal.iColumn ref && Internal.iLine pos /= Internal.iLine ref)
+
+-- | Parses a block of lines at the same indentation level starting at the
+-- current position
+getBlock :: Bool -> Internal.Indentation -> Parser Stmt
+getBlock False _ = return $ (Seq [])
+getBlock True ref = do 
+      stmt <- getNextStmt
+      pos <- indentation
+      (Seq ls) <- (getBlock (isInBlock ref pos) ref)
+      return $ (Seq (stmt : ls))
+
+-- | Collect the block of instruction in the same indentation level
+codeBlock :: Parser Stmt
+codeBlock = do
+    ref <- indentation
+    stmt <- (getBlock (isInBlock ref ref) ref)
+    return $ stmt
+
+-- | Returns the next Statement in the program
+getNextStmt :: Parser Stmt
+getNextStmt =
+  do whiteSpace
+     stmt <- statement
+     semi
+     return $ stmt
+
 funcStmt :: Parser Stmt
 funcStmt = 
   do reserved "function"
@@ -169,9 +210,12 @@ funcStmt =
      inputs <- sepBy identifier (symbol ",")
      reserved "returns"
      outputs <- sepBy expression (symbol ",")
-     reserved "fun"
-     body <- statements
-     reserved "nuf"
+--     reserved "fun"
+--     body <- statements
+--     reserved "nuf"
+     body <- codeBlock
+     input <- getInput
+     setInput (";\n" ++ input)
      return $ FuncStmt name body inputs outputs
 
 callStmt :: Parser Stmt

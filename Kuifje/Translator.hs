@@ -245,6 +245,7 @@ translateKuifje (Switch var list def) fBody =
           (fst (translateKuifje (head list) fBody))
           (fst (translateKuifje (Switch var (tail list) def) fBody)), fBody)
 translateKuifje (FuncStmt name body lInput lOutput) fBody = 
+--          error ("\n\nBody is :>>\n" ++ (show body) ++ "\n\n")
           let nMap = Map.insert name (body, lInput, lOutput) fBody 
               stmt = fst (translateKuifje (Kuifje.Syntax.Skip) fBody)
           in (stmt, nMap)

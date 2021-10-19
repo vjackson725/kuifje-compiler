@@ -21,13 +21,14 @@ getFrom g s | Just x <- E.lookup g s = x
 project :: String -> Dist (Dist Gamma) -> Dist (Dist Value)
 project var = fmap (fmap (\s -> getFrom s var))
 
-runHyper s = do tmp <- parseFile s 
+runHyper s = do tmp <- parseFile s
                 let m = Map.empty
                 let g = fst (translateKuifje tmp m)
                 let kuifje = hysem g (uniform [E.empty])
                 let (env, _) = (toList $ runD kuifje) !! 0
                 let (gamma, _) = ((toList $ runD $ env) !! 0)
                 let all_var = E.allVar gamma
+                --error ("\nVars are:\n" ++ (show all_var) ++ "\n")
                 outputL [(x, Kuifje.Run.project x kuifje) | x <- all_var]
 
 
