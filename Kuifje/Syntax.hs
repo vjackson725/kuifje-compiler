@@ -47,6 +47,7 @@ data Expr = Var String
           | Eset (Set Expr)
           | Case Expr Expr
           | ExprSwitch Expr [Expr] Expr
+          | Geometric Expr Expr Expr Expr
           deriving (Show, Eq, Ord)
 
 data ABinOp = Add 
@@ -62,12 +63,13 @@ data Stmt = Seq [Stmt]
           | Assign String Expr
           | If Expr Stmt Stmt 
           | While Expr Stmt
-          | FuncStmt String Stmt [String] [Expr]
+          | FuncStmt String Stmt [String] --[Expr]
+          | ReturnStmt [Expr]
           | CallStmt String [Expr] [String]
           | Switch Expr [Stmt] Stmt
           | CaseStmt Expr Stmt
           | Skip 
           | Leak Expr
           | Vis String
-          | Echoice Stmt Stmt Expr 
+          | Echoice Stmt Stmt Expr
 deriving instance Show Stmt

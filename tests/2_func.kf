@@ -1,0 +1,9 @@
+prob = (1 [1/3] 2);
+
+def f1(p):
+  z := p + 2;
+  y := z + 1;
+  return y;
+
+call f1 prob returns b;
+leak b;

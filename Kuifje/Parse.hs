@@ -53,6 +53,7 @@ languageDef =
                                       , "leak"
                                       , "observe"
                                       , "uniform"
+                                      , "geometric"
                                       , "|"
                                       , "switch"
                                       , "case"
@@ -145,6 +146,7 @@ sOperators =
 sTerm :: Parser Stmt
 sTerm = (braces statements
          <|> funcStmt
+         <|> returnStmt
          <|> caseStmt
          <|> assignStmt
          <|> callStmt
@@ -165,7 +167,6 @@ ifStmt =
      stmt2 <- statements
      reserved "fi"
      return $ If cond stmt1 stmt2
-
 
 -- | Obtain the current indentation, to be used as a reference later.
 indentation :: Monad m => ParsecT s u m Internal.Indentation
@@ -203,21 +204,42 @@ getNextStmt =
      semi
      return $ stmt
 
+--funcStmt :: Parser Stmt
+--funcStmt = 
+--  do reserved "function"
+--     name <- identifier
+--     inputs <- sepBy identifier (symbol ",")
+--     reserved "returns"
+--     outputs <- sepBy expression (symbol ",")
+--     body <- codeBlock
+--     input <- getInput
+--     setInput (";\n" ++ input)
+--     return $ FuncStmt name body inputs outputs
+
 funcStmt :: Parser Stmt
 funcStmt = 
-  do reserved "function"
+  do reserved "def"
      name <- identifier
-     inputs <- sepBy identifier (symbol ",")
-     reserved "returns"
-     outputs <- sepBy expression (symbol ",")
---     reserved "fun"
---     body <- statements
---     reserved "nuf"
+     whiteSpace
+     -- Input Parameters
+     inputs <- sepBy (parens identifier) (symbol ",")
+     whiteSpace
+     reserved ":"
      body <- codeBlock
+     -- Output Parameters - Only in the end of the function:
+     --reserved "return"
+     --outputs <- sepBy expression (symbol ",")
      input <- getInput
      setInput (";\n" ++ input)
-     return $ FuncStmt name body inputs outputs
+     --return $ FuncStmt name body inputs outputs
+     return $ FuncStmt name body inputs
 
+returnStmt :: Parser Stmt
+returnStmt =
+  do reserved "return"
+     outputs <- sepBy expression (symbol ",")
+     return $ ReturnStmt outputs
+     
 callStmt :: Parser Stmt
 callStmt =
   do reserved "call"
@@ -320,6 +342,7 @@ eTerm = (parens expression
         <|> try uniformSetVar
         <|> try uniformIchoicesListComp
         <|> try notUniformIchoices
+        <|> try geometricIchoices
         <|> switchExpr
         <|> (liftM RationalConst (try decimalRat) <?> "rat")
         <|> (liftM Var identifier <?> "var")
@@ -383,6 +406,14 @@ uniformSetVar =
         do reserved "uniform"
            expr <- liftM Var identifier
            return $ SetIchoice expr
+
+geometricIchoices =
+  do reserved "geometric"
+     alpha <- expression
+     low <- integer
+     start <- expression
+     high <- integer
+     return $ Geometric alpha (RationalConst (low % 1)) start (RationalConst (high % 1))
 
 setExpr = 
         do reserved "set"

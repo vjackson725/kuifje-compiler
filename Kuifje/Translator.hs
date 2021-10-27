@@ -116,6 +116,7 @@ evalE (INUchoices ls) =
      else error ("Probability adds up to: " ++ 
           (show (evalTList $ INUchoices ls)) ++
           " --> It should be 1.0" )
+
 --evalE (INUchoices ls) =
 --  if length ls == 1
 --     then evalE $ head ls
@@ -162,6 +163,28 @@ evalE (SetIchoice e) = \s ->
                                         | elem <- DSET.toList set] 
                                         | (S set, p) <- toList (runD d)]
          in D $ fromListWith (+) resultList
+evalE (Geometric alpha low start high) =
+         let alphaV = evalTList $ alpha
+             lowV = round (evalTList $ low)
+             highV = round (evalTList $ high)
+             startV = round (evalTList $ start)
+             interprobs = [(calcGeom alphaV startV x) | x <- [(lowV+1)..(highV-1)]]
+             lowLimit = calcLimitGeom alphaV startV lowV
+             highLimit = calcLimitGeom alphaV startV highV
+             values = [x | x <- [lowV .. highV]]
+             probs = [lowLimit] ++ interprobs ++ [highLimit]
+             sProbs = sum probs
+             resultDist = buildDist values probs
+         in evalNUList $ INUchoices resultDist
+           --  error ("\nValues are:\n" ++ (show alphaV) ++
+           --  "\n" ++ (show lowV) ++
+           --  "\n" ++ (show startV) ++
+           --  "\n" ++ (show highV) ++
+           --  "\n" ++ (show values) ++
+           --  "\n" ++ (show resultDist) ++
+           --  "\n" ++ (show lowLimit) ++
+           --  "\n" ++ (show highLimit) ++ 
+           --  "\n" ++ (show sProbs) ++ "\n")
 evalE (ExprSwitch var ls def) = 
   if length ls == 0
       then evalE $ def
@@ -185,6 +208,20 @@ evalE (Case val e) =
 evalCase :: Expr -> [Expr]
 evalCase (Case val e) = 
   [val, e]
+
+buildDist :: [Integer] -> [Rational] -> [Expr]
+buildDist [] [] = []
+buildDist values probs = 
+         let value = head values
+             prob = head probs
+             tl = buildDist (tail values) (tail probs)
+          in (Tuple (RationalConst (value % 1)) (RationalConst prob)) : tl
+
+calcLimitGeom :: Double -> Integer -> Integer -> Rational
+calcLimitGeom alpha start bound = realToFrac ((1 / (1 + alpha)) * (alpha^(abs (bound - start))))
+
+calcGeom :: Double -> Integer -> Integer -> Rational
+calcGeom alpha start n = realToFrac (((1 - alpha) / (1 + alpha)) * (alpha^(abs (n - start))))
 
 evalTList :: Expr -> Double
 --error ("Value is " ++ (show p))
@@ -244,11 +281,18 @@ translateKuifje (Switch var list def) fBody =
           (\s -> let currS = (evalE ((RBinary Eq) var (evalCaseStmt (head list)))) s in fmap (\r -> case r of (B b) -> b) currS)
           (fst (translateKuifje (head list) fBody))
           (fst (translateKuifje (Switch var (tail list) def) fBody)), fBody)
-translateKuifje (FuncStmt name body lInput lOutput) fBody = 
---          error ("\n\nBody is :>>\n" ++ (show body) ++ "\n\n")
-          let nMap = Map.insert name (body, lInput, lOutput) fBody 
+--translateKuifje (FuncStmt name body lInput lOutput) fBody = 
+--          let nMap = Map.insert name (body, lInput, lOutput) fBody 
+--              stmt = fst (translateKuifje (Kuifje.Syntax.Skip) fBody)
+--          in (stmt, nMap)
+translateKuifje (FuncStmt name body lInput) fBody = 
+          let (Seq ls) = body
+              lOutput = findReturns ls
+              nMap = Map.insert name (body, lInput, lOutput) fBody 
               stmt = fst (translateKuifje (Kuifje.Syntax.Skip) fBody)
           in (stmt, nMap)
+-- Returns were processed by FuncStmt, and should be skiped at this point:
+translateKuifje (ReturnStmt outputs) fBody = (skip, fBody)
 translateKuifje (CallStmt name lInput lOutput) fBody =
           let base = (getFuncBody name fBody)
               baseStmt = fst3 base
@@ -260,6 +304,24 @@ translateKuifje (CallStmt name lInput lOutput) fBody =
           in translateKuifje inCntxStmt fBody
 --         error ("Cntx is " ++ (show inCntxStmt))
 --       translateKuifje (fst3 (getFuncBody name fBody)) fBody
+
+isReturnStmt :: Stmt -> Bool
+isReturnStmt (ReturnStmt _) = True
+isReturnStmt _ = False
+
+getReturnExpr :: Stmt -> [Expr]
+getReturnExpr (ReturnStmt expr) = expr
+getReturnExpr _ = []
+
+findReturns :: [Stmt] -> [Expr]
+-- Skip if no returns were found
+findReturns [] = []
+findReturns fBody = 
+           let hd = (head fBody)
+               tl = findReturns (tail fBody) 
+           in if (isReturnStmt hd)
+              then (getReturnExpr hd) ++ tl
+              else tl
 
 addInputCntx :: String -> [String] -> [Expr] -> Stmt -> Stmt
 addInputCntx fName [] [] stmt = stmt
