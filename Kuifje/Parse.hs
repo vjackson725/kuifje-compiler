@@ -148,8 +148,8 @@ sTerm = (braces statements
          <|> funcStmt
          <|> returnStmt
          <|> caseStmt
+         <|> try callStmt
          <|> assignStmt
-         <|> callStmt
          <|> ifStmt
          <|> whileStmt
          <|> switchStmt
@@ -242,12 +242,23 @@ returnStmt =
      
 callStmt :: Parser Stmt
 callStmt =
-  do reserved "call"
+  do output <- identifier
+     reserved "="
      name <- identifier
+     reservedOp "("
      inputs <- sepBy expression (symbol ",")
-     reserved "returns"
-     outputs <- sepBy identifier (symbol ",")
-     return $ CallStmt name inputs outputs
+     reservedOp ")"
+     return $ CallStmt name inputs [output]
+
+
+--callStmt :: Parser Stmt
+--callStmt =
+--  do reserved "call"
+--     name <- identifier
+--     inputs <- sepBy expression (symbol ",")
+--     reserved "returns"
+--     outputs <- sepBy identifier (symbol ",")
+--     return $ CallStmt name inputs outputs
 
 caseStmt :: Parser Stmt
 caseStmt =
@@ -280,7 +291,7 @@ whileStmt =
 assignStmt :: Parser Stmt
 assignStmt =
   do var  <- identifier
-     reservedOp ":="
+     reservedOp "="
      expr <- expression 
      return $ Assign var expr
 
@@ -308,7 +319,7 @@ expression =
    buildExpressionParser eOperators eTerm << whiteSpace
       <?> "expression"
 
-eOperators = 
+eOperators =
         [ [Prefix (reservedOp "-"   >> return Neg               )          ]
         , [Prefix (reservedOp "~"   >> return Not               )          ]
         , [Infix  (reservedOp "*"   >> return (ABinary Multiply)) AssocLeft,
@@ -407,13 +418,25 @@ uniformSetVar =
            expr <- liftM Var identifier
            return $ SetIchoice expr
 
+getParam :: Integer -> [Expr] -> Expr
+getParam 0 ls = (head ls)
+getParam n ls = getParam (n-1) (tail ls)
+
 geometricIchoices =
   do reserved "geometric"
+     reservedOp "("
+     --params <- sepBy expression (symbol ",")
+     --reservedOp ")"
      alpha <- expression
-     low <- integer
+     reservedOp ","
+     low <- expression
+     reservedOp ","
      start <- expression
-     high <- integer
-     return $ Geometric alpha (RationalConst (low % 1)) start (RationalConst (high % 1))
+     reservedOp ","
+     high <- expression
+     reservedOp ")"
+     return $ Geometric alpha low start high
+     --return $ Geometric (getParam 0 params) (getParam 1 params) (getParam 2 params) (getParam 3 params)
 
 setExpr = 
         do reserved "set"
