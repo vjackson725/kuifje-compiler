@@ -61,7 +61,7 @@ data ABinOp = Add
 
 data Stmt = Seq [Stmt]
           | Assign String Expr
-          | If Expr Stmt Stmt 
+          | If Expr Stmt Stmt
           | While Expr Stmt
           | FuncStmt String Stmt [String] --[Expr]
           | ReturnStmt [Expr]

@@ -157,16 +157,58 @@ sTerm = (braces statements
          <|> vidStmt
          <|> leakStmt) << whiteSpace
 
+elseStmt :: Parser (Expr,Stmt)
+elseStmt = 
+   do reserved "else"
+      body <- codeBlock
+      -- For else statements, the condition should be always true
+      return $ ((RBinary Eq (RationalConst (1 % 1)) (RationalConst (1 % 1))) , body)
+
+ifCondStmt :: Parser (Expr,Stmt)
+ifCondStmt =
+   do reserved "if" <|> reserved "elif"
+      cond <- expression
+      reservedOp ":"
+      body <- codeBlock
+      return $ (cond, body)
+      
+checkIndent :: Expr -> Internal.Indentation -> Internal.Indentation -> Bool
+checkIndent expr ref pos = 
+   if expr == (RBinary Eq  (RationalConst (1 % 1)) (RationalConst (1 % 1)))
+      then False
+      else (isInBlock ref pos) 
+
+-- | Parses a block of lines at the same indentation level starting at the
+-- current position
+getIfBlock :: Bool -> Internal.Indentation -> Parser Stmt
+getIfBlock False _ = return $ Skip
+getIfBlock True ref = do
+      (cond, stmt) <- option ((RBinary Eq  (RationalConst (1 % 1)) (RationalConst (1 % 1))),Skip) (ifCondStmt <|> elseStmt)
+      pos <- indentation
+      elseBlock <- (getIfBlock (checkIndent cond ref pos) ref)
+      return $ (If cond stmt elseBlock)
+
+ifBlock :: Parser Stmt
+ifBlock = do
+   ref <- indentation
+   stmt <- (getIfBlock (isInBlock ref ref) ref)
+   return $ stmt
+
 ifStmt :: Parser Stmt
 ifStmt =
-  do reserved "if"
-     cond  <- expression
-     reserved "then"
-     stmt1 <- statements
-     reserved "else"
-     stmt2 <- statements
-     reserved "fi"
-     return $ If cond stmt1 stmt2
+   do stmts <- ifBlock
+      return $ stmts
+
+--ifStmt :: Parser Stmt
+--ifStmt =
+--  do reserved "if"
+--     cond  <- expression
+--     reserved "then"
+--     stmt1 <- statements
+--     reserved "else"
+--     stmt2 <- statements
+--     reserved "fi"
+--     return $ If cond stmt1 stmt2
 
 -- | Obtain the current indentation, to be used as a reference later.
 indentation :: Monad m => ParsecT s u m Internal.Indentation
@@ -306,8 +348,10 @@ vidStmt =
 
 leakStmt :: Parser Stmt
 leakStmt = 
-  do reserved "leak" <|> reserved "print" <|> reserved "observe"
+  do reserved "leak" <|> reserved "observe" -- <|> reserved "print"
+     reservedOp "("
      expr <- expression
+     reservedOp ")"
      return $ Leak expr
 
 --
