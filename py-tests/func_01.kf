@@ -1,9 +1,10 @@
 prob = (1 [1/3] 2);
+prob01 <- prob;
 
 def f1(p):
   z = p + 2;
   y = z + 1;
   return y;
 
-b = f1(prob);
+b = f1(prob01);
 leak(b);

@@ -1,6 +1,7 @@
 p = (1 [1/2] 2);
+prob <- p;
 
-if p < 3:
+if prob < 3:
   x = 2 + 1; 
 
 leak(x);

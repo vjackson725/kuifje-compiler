@@ -149,6 +149,7 @@ sTerm = (braces statements
          <|> returnStmt
          <|> caseStmt
          <|> try callStmt
+         <|> try samplingStmt
          <|> assignStmt
          <|> ifStmt
          <|> whileStmt
@@ -246,18 +247,6 @@ getNextStmt =
      semi
      return $ stmt
 
---funcStmt :: Parser Stmt
---funcStmt = 
---  do reserved "function"
---     name <- identifier
---     inputs <- sepBy identifier (symbol ",")
---     reserved "returns"
---     outputs <- sepBy expression (symbol ",")
---     body <- codeBlock
---     input <- getInput
---     setInput (";\n" ++ input)
---     return $ FuncStmt name body inputs outputs
-
 funcStmt :: Parser Stmt
 funcStmt = 
   do reserved "def"
@@ -269,11 +258,8 @@ funcStmt =
      reserved ":"
      body <- codeBlock
      -- Output Parameters - Only in the end of the function:
-     --reserved "return"
-     --outputs <- sepBy expression (symbol ",")
      input <- getInput
      setInput (";\n" ++ input)
-     --return $ FuncStmt name body inputs outputs
      return $ FuncStmt name body inputs
 
 returnStmt :: Parser Stmt
@@ -292,15 +278,6 @@ callStmt =
      reservedOp ")"
      return $ CallStmt name inputs [output]
 
-
---callStmt :: Parser Stmt
---callStmt =
---  do reserved "call"
---     name <- identifier
---     inputs <- sepBy expression (symbol ",")
---     reserved "returns"
---     outputs <- sepBy identifier (symbol ",")
---     return $ CallStmt name inputs outputs
 
 caseStmt :: Parser Stmt
 caseStmt =
@@ -336,6 +313,13 @@ assignStmt =
      reservedOp "="
      expr <- expression 
      return $ Assign var expr
+
+samplingStmt :: Parser Stmt
+samplingStmt =
+  do var <- identifier
+     reservedOp "<-"
+     (Var dist) <- expression
+     return $ Assign var (Var dist)
 
 skipStmt :: Parser Stmt
 skipStmt = reserved "skip" >> return Skip
@@ -466,21 +450,18 @@ getParam :: Integer -> [Expr] -> Expr
 getParam 0 ls = (head ls)
 getParam n ls = getParam (n-1) (tail ls)
 
+expNegNumber :: Parser Expr
+expNegNumber =
+  do reservedOp "-"
+     number <- expression
+     return $ (Neg number)
+
 geometricIchoices =
   do reserved "geometric"
      reservedOp "("
-     --params <- sepBy expression (symbol ",")
-     --reservedOp ")"
-     alpha <- expression
-     reservedOp ","
-     low <- expression
-     reservedOp ","
-     start <- expression
-     reservedOp ","
-     high <- expression
+     params <- sepBy (expNegNumber <|> expression) (symbol ",")
      reservedOp ")"
-     return $ Geometric alpha low start high
-     --return $ Geometric (getParam 0 params) (getParam 1 params) (getParam 2 params) (getParam 3 params)
+     return $ Geometric (getParam 0 params) (getParam 1 params) (getParam 2 params) (getParam 3 params)
 
 setExpr = 
         do reserved "set"

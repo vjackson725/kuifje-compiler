@@ -176,15 +176,6 @@ evalE (Geometric alpha low start high) =
              sProbs = sum probs
              resultDist = buildDist values probs
          in evalNUList $ INUchoices resultDist
-           --  error ("\nValues are:\n" ++ (show alphaV) ++
-           --  "\n" ++ (show lowV) ++
-           --  "\n" ++ (show startV) ++
-           --  "\n" ++ (show highV) ++
-           --  "\n" ++ (show values) ++
-           --  "\n" ++ (show resultDist) ++
-           --  "\n" ++ (show lowLimit) ++
-           --  "\n" ++ (show highLimit) ++ 
-           --  "\n" ++ (show sProbs) ++ "\n")
 evalE (ExprSwitch var ls def) = 
   if length ls == 0
       then evalE $ def
@@ -226,6 +217,7 @@ calcGeom alpha start n = realToFrac (((1 - alpha) / (1 + alpha)) * (alpha^(abs (
 evalTList :: Expr -> Double
 --error ("Value is " ++ (show p))
 evalTList (RationalConst a) = (fromRat a)
+evalTList (Neg a) = -1 * (evalTList a)
 evalTList (ABinary Divide a b) = 
   let aVal = (evalTList $ a)
       bVal = (evalTList $ b)
@@ -281,10 +273,6 @@ translateKuifje (Switch var list def) fBody =
           (\s -> let currS = (evalE ((RBinary Eq) var (evalCaseStmt (head list)))) s in fmap (\r -> case r of (B b) -> b) currS)
           (fst (translateKuifje (head list) fBody))
           (fst (translateKuifje (Switch var (tail list) def) fBody)), fBody)
---translateKuifje (FuncStmt name body lInput lOutput) fBody = 
---          let nMap = Map.insert name (body, lInput, lOutput) fBody 
---              stmt = fst (translateKuifje (Kuifje.Syntax.Skip) fBody)
---          in (stmt, nMap)
 translateKuifje (FuncStmt name body lInput) fBody = 
           let (Seq ls) = body
               lOutput = findReturns ls
@@ -302,8 +290,6 @@ translateKuifje (CallStmt name lInput lOutput) fBody =
               outCntxStmt = addOutputCntx name fOutput lOutput baseUpdated
               inCntxStmt = addInputCntx name fInput lInput outCntxStmt
           in translateKuifje inCntxStmt fBody
---         error ("Cntx is " ++ (show inCntxStmt))
---       translateKuifje (fst3 (getFuncBody name fBody)) fBody
 
 isReturnStmt :: Stmt -> Bool
 isReturnStmt (ReturnStmt _) = True
