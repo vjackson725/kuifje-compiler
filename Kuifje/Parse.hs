@@ -152,8 +152,8 @@ sTerm = (braces statements
          <|> try samplingStmt
          <|> assignStmt
          <|> ifStmt
-         <|> whileStmt
          <|> switchStmt
+         <|> whileStmt
          <|> skipStmt
          <|> vidStmt
          <|> leakStmt) << whiteSpace
@@ -197,7 +197,10 @@ ifBlock = do
 
 ifStmt :: Parser Stmt
 ifStmt =
-   do stmts <- ifBlock
+   do reserved "if"
+      input <- getInput
+      setInput ("if" ++ input)
+      stmts <- ifBlock
       return $ stmts
 
 --ifStmt :: Parser Stmt
@@ -302,10 +305,17 @@ whileStmt :: Parser Stmt
 whileStmt =
   do reserved "while"
      cond <- expression
-     reserved "do"
-     stmt <- statements
-     reserved "od"
-     return $ While cond stmt
+     reservedOp ":"
+     stmt <- codeBlock
+     input <- getInput
+     setInput (";\n" ++ input)
+     return $ While cond stmt 
+--  do reserved "while"
+--     cond <- expression
+--     reserved "do"
+--     stmt <- statements
+--     reserved "od"
+--     return $ While cond stmt
 
 assignStmt :: Parser Stmt
 assignStmt =
