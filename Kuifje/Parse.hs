@@ -161,6 +161,7 @@ sTerm = (braces statements
 elseStmt :: Parser (Expr,Stmt)
 elseStmt = 
    do reserved "else"
+      reservedOp ":"
       body <- codeBlock
       -- For else statements, the condition should be always true
       return $ ((RBinary Eq (RationalConst (1 % 1)) (RationalConst (1 % 1))) , body)
@@ -171,6 +172,7 @@ ifCondStmt =
       cond <- expression
       reservedOp ":"
       body <- codeBlock
+      input <- getInput
       return $ (cond, body)
       
 checkIndent :: Expr -> Internal.Indentation -> Internal.Indentation -> Bool
@@ -191,6 +193,7 @@ getIfBlock True ref = do
 
 ifBlock :: Parser Stmt
 ifBlock = do
+   input <- getInput
    ref <- indentation
    stmt <- (getIfBlock (isInBlock ref ref) ref)
    return $ stmt
@@ -199,7 +202,7 @@ ifStmt :: Parser Stmt
 ifStmt =
    do reserved "if"
       input <- getInput
-      setInput ("if" ++ input)
+      setInput ("if " ++ input)
       stmts <- ifBlock
       return $ stmts
 
@@ -263,6 +266,7 @@ funcStmt =
      -- Output Parameters - Only in the end of the function:
      input <- getInput
      setInput (";\n" ++ input)
+     error ("Body Func is:\n" ++ (show body) ++ "\n\n")
      return $ FuncStmt name body inputs
 
 returnStmt :: Parser Stmt
@@ -310,12 +314,6 @@ whileStmt =
      input <- getInput
      setInput (";\n" ++ input)
      return $ While cond stmt 
---  do reserved "while"
---     cond <- expression
---     reserved "do"
---     stmt <- statements
---     reserved "od"
---     return $ While cond stmt
 
 assignStmt :: Parser Stmt
 assignStmt =

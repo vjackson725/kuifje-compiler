@@ -3,7 +3,7 @@ prob <- p;
 
 if prob > 1:
   x = 2 + 1; 
-else 
+else: 
   x = 1; 
 fi;
 

@@ -5,7 +5,7 @@ if a == 1:
   x = 2 + 1; 
 elif a == 2:
   x = 10;
-else 
+else:
   x = 1; 
 
 leak(x);

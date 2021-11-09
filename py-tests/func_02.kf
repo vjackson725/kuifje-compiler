@@ -1,0 +1,11 @@
+def toyfunc(a):
+  if a == 1:
+    dist = 5;
+  else:
+    dist = 2;
+  return dist;
+
+prob = (1 [1/4] 2);
+s <- prob;
+x = toyfunc(s);
+leak(x);
