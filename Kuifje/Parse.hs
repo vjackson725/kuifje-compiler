@@ -160,18 +160,32 @@ sTerm = (braces statements
 
 elseStmt :: Parser (Expr,Stmt)
 elseStmt = 
-   do reserved "else"
+   do ref <- indentationBlock
+      reserved "else"
       reservedOp ":"
-      body <- codeBlock
+      body <- codeBlock ref
       -- For else statements, the condition should be always true
+      input <- getInput
+--      error ("Input is:\n" ++ (show input))
       return $ ((RBinary Eq (RationalConst (1 % 1)) (RationalConst (1 % 1))) , body)
 
 ifCondStmt :: Parser (Expr,Stmt)
 ifCondStmt =
-   do reserved "if" <|> reserved "elif"
+   do ref <- indentationBlock
+      reserved "if"
       cond <- expression
       reservedOp ":"
-      body <- codeBlock
+      body <- codeBlock ref
+      input <- getInput
+      return $ (cond, body)
+
+elifCondStmt :: Parser (Expr,Stmt)
+elifCondStmt =
+   do ref <- indentationBlock
+      reserved "elif"
+      cond <- expression
+      reservedOp ":"
+      body <- codeBlock ref
       input <- getInput
       return $ (cond, body)
       
@@ -186,36 +200,20 @@ checkIndent expr ref pos =
 getIfBlock :: Bool -> Internal.Indentation -> Parser Stmt
 getIfBlock False _ = return $ Skip
 getIfBlock True ref = do
-      (cond, stmt) <- option ((RBinary Eq  (RationalConst (1 % 1)) (RationalConst (1 % 1))),Skip) (ifCondStmt <|> elseStmt)
       pos <- indentation
+      (cond, stmt) <- option ((RBinary Eq  (RationalConst (1 % 1)) (RationalConst (1 % 1))),Skip) (elifCondStmt <|> elseStmt)
       elseBlock <- (getIfBlock (checkIndent cond ref pos) ref)
       return $ (If cond stmt elseBlock)
 
-ifBlock :: Parser Stmt
-ifBlock = do
-   input <- getInput
-   ref <- indentation
-   stmt <- (getIfBlock (isInBlock ref ref) ref)
-   return $ stmt
-
 ifStmt :: Parser Stmt
 ifStmt =
-   do reserved "if"
+   do ref <- indentation
+      (cond, stmt) <- ifCondStmt
+      pos <- indentation
+      elseBlock <- (getIfBlock (isInBlock ref pos) ref)
       input <- getInput
-      setInput ("if " ++ input)
-      stmts <- ifBlock
-      return $ stmts
-
---ifStmt :: Parser Stmt
---ifStmt =
---  do reserved "if"
---     cond  <- expression
---     reserved "then"
---     stmt1 <- statements
---     reserved "else"
---     stmt2 <- statements
---     reserved "fi"
---     return $ If cond stmt1 stmt2
+      setInput (";" ++ input)
+      return $ (If cond stmt elseBlock)
 
 -- | Obtain the current indentation, to be used as a reference later.
 indentation :: Monad m => ParsecT s u m Internal.Indentation
@@ -223,10 +221,16 @@ indentation = do
     pos <- getPosition
     return $! Internal.Indentation {Internal.iLine = sourceLine pos, Internal.iColumn = sourceColumn pos}
 
+-- | Obtain the current indentation, to be used as a reference later.
+indentationBlock :: Monad m => ParsecT s u m Internal.Indentation
+indentationBlock = do
+    pos <- getPosition
+    return $! Internal.Indentation {Internal.iLine = sourceLine pos, Internal.iColumn = ((sourceColumn pos) +  1)}
+
+
 -- | Verifies if the position is in the same block as the reference position
 isInBlock :: Internal.Indentation -> Internal.Indentation -> Bool
 isInBlock ref pos = (Internal.iColumn pos >= Internal.iColumn ref)
---(Internal.iColumn pos == Internal.iColumn ref && Internal.iLine pos /= Internal.iLine ref)
 
 -- | Parses a block of lines at the same indentation level starting at the
 -- current position
@@ -239,9 +243,8 @@ getBlock True ref = do
       return $ (Seq (stmt : ls))
 
 -- | Collect the block of instruction in the same indentation level
-codeBlock :: Parser Stmt
-codeBlock = do
-    ref <- indentation
+codeBlock :: Internal.Indentation -> Parser Stmt
+codeBlock ref = do
     stmt <- (getBlock (isInBlock ref ref) ref)
     return $ stmt
 
@@ -255,18 +258,19 @@ getNextStmt =
 
 funcStmt :: Parser Stmt
 funcStmt = 
-  do reserved "def"
+  do ref <- indentationBlock
+     reserved "def"
      name <- identifier
      whiteSpace
      -- Input Parameters
      inputs <- sepBy (parens identifier) (symbol ",")
      whiteSpace
      reserved ":"
-     body <- codeBlock
+     body <- codeBlock ref
      -- Output Parameters - Only in the end of the function:
      input <- getInput
-     setInput (";\n" ++ input)
-     error ("Body Func is:\n" ++ (show body) ++ "\n\n")
+     setInput (";" ++ input)
+--     error ("Body Func is:\n" ++ (show input) ++ "\n\n")
      return $ FuncStmt name body inputs
 
 returnStmt :: Parser Stmt
@@ -307,10 +311,11 @@ switchStmt =
 
 whileStmt :: Parser Stmt
 whileStmt =
-  do reserved "while"
+  do ref <- indentationBlock
+     reserved "while"
      cond <- expression
      reservedOp ":"
-     stmt <- codeBlock
+     stmt <- codeBlock ref
      input <- getInput
      setInput (";\n" ++ input)
      return $ While cond stmt 
@@ -458,16 +463,10 @@ getParam :: Integer -> [Expr] -> Expr
 getParam 0 ls = (head ls)
 getParam n ls = getParam (n-1) (tail ls)
 
-expNegNumber :: Parser Expr
-expNegNumber =
-  do reservedOp "-"
-     number <- expression
-     return $ (Neg number)
-
 geometricIchoices =
   do reserved "geometric"
      reservedOp "("
-     params <- sepBy (expNegNumber <|> expression) (symbol ",")
+     params <- sepBy expression (symbol ",")
      reservedOp ")"
      return $ Geometric (getParam 0 params) (getParam 1 params) (getParam 2 params) (getParam 3 params)
 

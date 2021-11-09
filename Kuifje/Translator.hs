@@ -19,7 +19,8 @@ import qualified Data.Set as DSET
 import Numeric
 
 import Language.Kuifje.Distribution
-import Kuifje.PrettyPrint 
+--import Kuifje.PrettyPrint 
+import Language.Kuifje.PrettyPrint 
 import Language.Kuifje.Semantics
 import Language.Kuifje.Syntax
 import Control.Applicative

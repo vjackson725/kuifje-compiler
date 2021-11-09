@@ -5,14 +5,17 @@ import Kuifje.Parse
 import Kuifje.Value
 import Kuifje.Syntax
 import Kuifje.PrettyPrint 
+import qualified Kuifje.Env as E
+
 import System.IO 
 import Data.Map.Strict
 import Data.List
 import Language.Kuifje.Distribution
+import Language.Kuifje.PrettyPrint
 import Language.Kuifje.Semantics
 import Language.Kuifje.Syntax
+import Text.PrettyPrint.Boxes (printBox)
 import Prelude hiding ((!!), fmap, (>>=))
-import qualified Kuifje.Env as E
 import qualified Data.Map as Map
 
 getFrom g s | Just x <- E.lookup g s = x
@@ -32,18 +35,17 @@ runHyper s = do tmp <- parseFile s
                 outputL [(x, Kuifje.Run.project x kuifje) | x <- all_var]
 
 
-outputL (ls) = if length ls == 1 
-                  then do putStrLn $ "> Variable " ++ (fst $ head ls) ++ " hyper"
-                          print $ snd $ head ls
-                          putStrLn "> condEntropy bayesVuln hyper"
-                          putStrLn ""
-                          print $ condEntropy bayesVuln $ snd $ head ls
-                  else do putStrLn $ "> Variable " ++ (fst $ head ls) ++ " hyper"
-                          print $ snd $ head ls
-                          putStrLn "> condEntropy bayesVuln hyper"
-                          print $ condEntropy bayesVuln $ snd $ head ls
-                          putStrLn ""
-                          outputL $ tail ls
+
+outputL :: (Ord a, Boxable a) => [(String, Hyper a)] -> IO ()
+outputL ls =
+  mapM_ (\l ->
+    do
+      putStrLn $ "> Variable " ++ fst l ++ " hyper"
+      printBox . toBox . snd $ l
+      putStrLn $ "> condEntropy bayesVuln " ++ fst l ++ " hyper"
+      printBox . toBox . condEntropy bayesVuln . snd $ l
+      putStrLn ""
+  ) ls
 
 runFile :: String -> IO ()
 runFile s = do runHyper s
