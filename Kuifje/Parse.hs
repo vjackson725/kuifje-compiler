@@ -239,7 +239,7 @@ getBlock False _ = return $ (Seq [])
 getBlock True ref = do 
       stmt <- getNextStmt
       pos <- indentation
-      (Seq ls) <- (getBlock (isInBlock ref pos) ref)
+      (Seq ls) <- option (Seq []) (getBlock (isInBlock ref pos) ref)
       return $ (Seq (stmt : ls))
 
 -- | Collect the block of instruction in the same indentation level
@@ -317,7 +317,7 @@ whileStmt =
      reservedOp ":"
      stmt <- codeBlock ref
      input <- getInput
-     setInput (";\n" ++ input)
+     setInput (";" ++ input)
      return $ While cond stmt 
 
 assignStmt :: Parser Stmt
