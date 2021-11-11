@@ -45,8 +45,8 @@ data Expr = Var String
           -- Extension
           | ExprIf Expr Expr Expr
           | Eset (Set Expr)
-          | Case Expr Expr
-          | ExprSwitch Expr [Expr] Expr
+ --         | Case Expr Expr
+--          | ExprSwitch Expr [Expr] Expr
           | Geometric Expr Expr Expr Expr
           deriving (Show, Eq, Ord)
 
@@ -66,8 +66,8 @@ data Stmt = Seq [Stmt]
           | FuncStmt String Stmt [String] --[Expr]
           | ReturnStmt [Expr]
           | CallStmt String [Expr] [String]
-          | Switch Expr [Stmt] Stmt
-          | CaseStmt Expr Stmt
+--          | Switch Expr [Stmt] Stmt
+--          | CaseStmt Expr Stmt
           | Skip 
           | Leak Expr
           | Vis String

@@ -147,12 +147,12 @@ sTerm :: Parser Stmt
 sTerm = (braces statements
          <|> funcStmt
          <|> returnStmt
-         <|> caseStmt
+--         <|> caseStmt
          <|> try callStmt
          <|> try samplingStmt
          <|> assignStmt
          <|> ifStmt
-         <|> switchStmt
+--         <|> switchStmt
          <|> whileStmt
          <|> skipStmt
          <|> vidStmt
@@ -290,24 +290,24 @@ callStmt =
      return $ CallStmt name inputs [output]
 
 
-caseStmt :: Parser Stmt
-caseStmt =
-  do val  <- integer
-     reserved "::"
-     stmt <- statements
-     return $ CaseStmt (RationalConst (val % 1)) stmt
+--caseStmt :: Parser Stmt
+--caseStmt =
+--  do val  <- integer
+--     reserved "::"
+--     stmt <- statements
+--     return $ CaseStmt (RationalConst (val % 1)) stmt
 
-switchStmt :: Parser Stmt
-switchStmt =
-  do reserved "switch"
-     var  <- expression
-     reserved "then"
-     reserved "case"
-     list <- sepBy statements (symbol "case")
-     reserved "default"
-     def <- statements
-     reserved "break"
-     return $ Switch var list def
+--switchStmt :: Parser Stmt
+--switchStmt =
+--  do reserved "switch"
+--     var  <- expression
+--     reserved "then"
+--     reserved "case"
+--     list <- sepBy statements (symbol "case")
+--     reserved "default"
+--     def <- statements
+--     reserved "break"
+--     return $ Switch var list def
 
 whileStmt :: Parser Stmt
 whileStmt =
@@ -380,7 +380,7 @@ eOperators =
         , [Infix  (reservedOp "=="  >> return (RBinary Eq)      ) AssocLeft] 
         , [Infix  (reservedOp "!="  >> return (RBinary Ne)      ) AssocLeft]
         , [Infix  (reservedOp "@"   >> return Tuple             ) AssocLeft]
-        , [Infix  (reservedOp "::"  >> return Case              ) AssocLeft] 
+--        , [Infix  (reservedOp "::"  >> return Case              ) AssocLeft] 
         ]
 
 eTerm :: Parser Expr
@@ -394,34 +394,87 @@ eTerm = (parens expression
         <|> try uniformSetVar
         <|> try uniformIchoicesListComp
         <|> try notUniformIchoices
-        <|> try geometricIchoices
-        <|> switchExpr
+        <|> geometricIchoices
+--        <|> switchExpr
         <|> (liftM RationalConst (try decimalRat) <?> "rat")
         <|> (liftM Var identifier <?> "var")
         <?> "eTerm") << whiteSpace
 
-ifExpr =
-  do reserved "if"
-     cond <- expression
-     reserved "then"
-     expr1 <- expression
-     reserved "else"
-     expr2 <- expression
-     reserved "fi"
-     return $ ExprIf cond expr1 expr2
-   <?> "if-expr"
 
-switchExpr =
-  do reserved "switch"
-     var <- expression
-     reserved "then"
-     reserved "case"
-     list <- sepBy expression (symbol "case")
-     reserved "default"
-     def <- expression
-     reserved "break"
-     return $ ExprSwitch var list def
-  <?> "switch-expr"
+
+
+elseExpr :: Parser (Expr,Expr)
+elseExpr =
+   do reserved "else"
+      reservedOp ":"
+      body <- expression
+      -- For else statements, the condition should be always true
+      return $ ((RBinary Eq (RationalConst (1 % 1)) (RationalConst (1 % 1))) , body)
+
+ifCondExpr :: Parser (Expr,Expr)
+ifCondExpr =
+   do reserved "if"
+      cond <- expression
+      reservedOp ":"
+      body <- expression
+      input <- getInput
+      return $ (cond, body)
+
+elifCondExpr :: Parser (Expr,Expr)
+elifCondExpr =
+   do reserved "elif"
+      cond <- expression
+      reservedOp ":"
+      body <- expression
+      input <- getInput
+      return $ (cond, body)
+
+checkExprEnd :: Expr -> Bool
+checkExprEnd expr =
+   if expr == (RBinary Ne (RationalConst (1 % 1)) (RationalConst (1 % 1)))
+      then False
+      else True
+
+-- | Parses a block of lines at the same indentation level starting at the
+-- current position
+getIfBlockExpr :: Bool -> Parser Expr
+-- Value assinged by default:
+getIfBlockExpr False = return $ error ("\nIf Expression does not add up to one.\n")
+getIfBlockExpr True = do
+      -- Option provides a default value, that is an indetermination.
+      -- If the values at this point add up to one, it will be naturally skiped.
+      -- Otherwise the default value will generate an error, as the Expression does not add up to one.
+      (cond, exprIf) <- option ((RBinary Ne (RationalConst (1 % 1)) (RationalConst (1 % 1))), (RationalConst (1 % 1))) (elifCondExpr <|> elseExpr) 
+      exprElse <- getIfBlockExpr (checkExprEnd cond)
+      return $ ExprIf cond exprIf exprElse
+
+ifExpr =
+  do (cond, exprIf) <- ifCondExpr
+     exprElse <- getIfBlockExpr (checkExprEnd cond)
+     return $ ExprIf cond exprIf exprElse
+
+--ifExpr =
+--  do reserved "if"
+--     cond <- expression
+--     reserved "then"
+--     expr1 <- expression
+--     reserved "else"
+--     expr2 <- expression
+--     reserved "fi"
+--     return $ ExprIf cond expr1 expr2
+--   <?> "if-expr"
+
+--switchExpr =
+--  do reserved "switch"
+--     var <- expression
+--     reserved "then"
+--     reserved "case"
+--     list <- sepBy expression (symbol "case")
+--     reserved "default"
+--     def <- expression
+--     reserved "break"
+--     return $ ExprSwitch var list def
+--  <?> "switch-expr"
 
 uniformIchoices = 
         do reserved "uniform"

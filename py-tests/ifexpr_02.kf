@@ -1,0 +1,10 @@
+// x := if () then 1 else 2;
+
+x = (0 [1/2] (1 [1/2] 2));
+y = if x > 1: 
+    4
+  elif x > 0:
+    5
+  else:
+    6;
+leak(y);

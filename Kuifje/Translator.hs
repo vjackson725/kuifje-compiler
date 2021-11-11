@@ -177,29 +177,29 @@ evalE (Geometric alpha low start high) =
              sProbs = sum probs
              resultDist = buildDist values probs
          in evalNUList $ INUchoices resultDist
-evalE (ExprSwitch var ls def) = 
-  if length ls == 0
-      then evalE $ def
-      else \s ->
-         let val = head (evalCase (head ls))
-             e1 = head (tail (evalCase (head ls)))
-             cond = ((RBinary Eq) var val)
-             cond' = runD $ (evalE cond) s
-             e1' = (evalE e1) s
-             e2' = (evalE $ ExprSwitch var (tail ls) def) s
-             d1 = case Data.Map.Strict.lookup (B True) cond' of
-                    (Just p)  -> D $ Data.Map.Strict.map (*p) $ runD e1'
-                    otherwise -> D $ Data.Map.Strict.empty
-             d2 = case Data.Map.Strict.lookup (B False) cond' of
-                    (Just p)  -> D $ Data.Map.Strict.map (*p) $ runD e2'
-                    otherwise -> D $ Data.Map.Strict.empty
-             in D $ unionWith (+) (runD d1) (runD d2)
-evalE (Case val e) =
-  evalE $ e
+--evalE (ExprSwitch var ls def) = 
+--  if length ls == 0
+--      then evalE $ def
+--      else \s ->
+--         let val = head (evalCase (head ls))
+--             e1 = head (tail (evalCase (head ls)))
+--             cond = ((RBinary Eq) var val)
+--             cond' = runD $ (evalE cond) s
+--             e1' = (evalE e1) s
+--             e2' = (evalE $ ExprSwitch var (tail ls) def) s
+--             d1 = case Data.Map.Strict.lookup (B True) cond' of
+--                    (Just p)  -> D $ Data.Map.Strict.map (*p) $ runD e1'
+--                    otherwise -> D $ Data.Map.Strict.empty
+--             d2 = case Data.Map.Strict.lookup (B False) cond' of
+--                    (Just p)  -> D $ Data.Map.Strict.map (*p) $ runD e2'
+--                    otherwise -> D $ Data.Map.Strict.empty
+--             in D $ unionWith (+) (runD d1) (runD d2)
+--evalE (Case val e) =
+--  evalE $ e
 
-evalCase :: Expr -> [Expr]
-evalCase (Case val e) = 
-  [val, e]
+--evalCase :: Expr -> [Expr]
+--evalCase (Case val e) = 
+--  [val, e]
 
 buildDist :: [Integer] -> [Rational] -> [Expr]
 buildDist [] [] = []
@@ -265,15 +265,15 @@ translateKuifje (Echoice s1 s2 p) fBody =
                   in (fmap (\r -> case r of (B b) -> b)) p') 
           (fst (translateKuifje s1  fBody)) 
           (fst (translateKuifje s2 fBody)), fBody)
-translateKuifje (CaseStmt exp stmt) fBody =
-          translateKuifje stmt fBody
-translateKuifje (Switch var list def) fBody =
-        if length list == 0
-        then (translateKuifje def fBody)
-        else (Language.Kuifje.Syntax.cond
-          (\s -> let currS = (evalE ((RBinary Eq) var (evalCaseStmt (head list)))) s in fmap (\r -> case r of (B b) -> b) currS)
-          (fst (translateKuifje (head list) fBody))
-          (fst (translateKuifje (Switch var (tail list) def) fBody)), fBody)
+--translateKuifje (CaseStmt exp stmt) fBody =
+--          translateKuifje stmt fBody
+--translateKuifje (Switch var list def) fBody =
+--        if length list == 0
+--        then (translateKuifje def fBody)
+--        else (Language.Kuifje.Syntax.cond
+--          (\s -> let currS = (evalE ((RBinary Eq) var (evalCaseStmt (head list)))) s in fmap (\r -> case r of (B b) -> b) currS)
+--          (fst (translateKuifje (head list) fBody))
+--          (fst (translateKuifje (Switch var (tail list) def) fBody)), fBody)
 translateKuifje (FuncStmt name body lInput) fBody = 
           let (Seq ls) = body
               lOutput = findReturns ls
@@ -391,14 +391,14 @@ updateExpression fName (RBinary op e1 e2) =
          newe2 = (updateExpression fName e2)
      in (RBinary op newe1 newe2)
 -- Support to Set not provided.
-updateExpression fName (ExprSwitch var [] def) =
-     let newvar = (updateExpression fName var)
-     in (ExprSwitch newvar [] def)
-updateExpression fName (ExprSwitch var ls def) =
-     let hd = (updateExpression fName (head ls))
-         tl = (updateExpression fName (ExprSwitch var (tail ls) def))
-         (ExprSwitch newvar list newdef) = tl
-     in (ExprSwitch newvar (hd : list) newdef)
+--updateExpression fName (ExprSwitch var [] def) =
+--     let newvar = (updateExpression fName var)
+--     in (ExprSwitch newvar [] def)
+--updateExpression fName (ExprSwitch var ls def) =
+--     let hd = (updateExpression fName (head ls))
+--         tl = (updateExpression fName (ExprSwitch var (tail ls) def))
+--         (ExprSwitch newvar list newdef) = tl
+--     in (ExprSwitch newvar (hd : list) newdef)
 updateExpression fName e = e
 
 updateStmtList :: String -> [Stmt] -> [Stmt]
@@ -422,15 +422,15 @@ updateStmtUses fName (Kuifje.Syntax.If e s1 s2) =
 updateStmtUses fName (Leak e) = (Leak (updateExpression fName e))
 updateStmtUses fName (Echoice s1 s2 p) =
      (Echoice (updateStmtUses fName s1) (updateStmtUses fName s2) (updateExpression fName p))
-updateStmtUses fName (CaseStmt exp stmt) =
-     (CaseStmt (updateExpression fName exp) (updateStmtUses fName stmt))
-updateStmtUses fName (Switch var [] def) =
-     (Switch (updateExpression fName var) [] (updateStmtUses fName def)) 
-updateStmtUses fName (Switch var ls def) =
-     let newVar = (updateExpression fName var)
-         newDef = (updateStmtUses fName  def)
-         newLs = (updateStmtList fName ls)
-     in (Switch newVar newLs newDef)
+--updateStmtUses fName (CaseStmt exp stmt) =
+--     (CaseStmt (updateExpression fName exp) (updateStmtUses fName stmt))
+--updateStmtUses fName (Switch var [] def) =
+--     (Switch (updateExpression fName var) [] (updateStmtUses fName def)) 
+--updateStmtUses fName (Switch var ls def) =
+--     let newVar = (updateExpression fName var)
+--         newDef = (updateStmtUses fName  def)
+--         newLs = (updateStmtList fName ls)
+--     in (Switch newVar newLs newDef)
 updateStmtUses fName stmt = stmt
 
 fst3 :: (a, b, c) -> a
@@ -449,8 +449,8 @@ fromJust Nothing = error "Function not found."
 getFuncBody :: String -> Map.Map String (Stmt, [String], [Expr]) -> (Stmt, [String], [Expr])
 getFuncBody id funcBody = fromJust (Map.lookup id funcBody)
 
-evalCaseStmt :: Stmt -> Expr
-evalCaseStmt (CaseStmt exp stmt) = exp
+--evalCaseStmt :: Stmt -> Expr
+--evalCaseStmt (CaseStmt exp stmt) = exp
 
 getRational :: Gamma -> String -> Rational
 getRational g s | Just (R t) <- E.lookup g s = t
