@@ -147,12 +147,11 @@ sTerm :: Parser Stmt
 sTerm = (braces statements
          <|> funcStmt
          <|> returnStmt
---         <|> caseStmt
          <|> try callStmt
          <|> try samplingStmt
+         <|> try supportStmt
          <|> assignStmt
          <|> ifStmt
---         <|> switchStmt
          <|> whileStmt
          <|> skipStmt
          <|> vidStmt
@@ -289,26 +288,6 @@ callStmt =
      reservedOp ")"
      return $ CallStmt name inputs [output]
 
-
---caseStmt :: Parser Stmt
---caseStmt =
---  do val  <- integer
---     reserved "::"
---     stmt <- statements
---     return $ CaseStmt (RationalConst (val % 1)) stmt
-
---switchStmt :: Parser Stmt
---switchStmt =
---  do reserved "switch"
---     var  <- expression
---     reserved "then"
---     reserved "case"
---     list <- sepBy statements (symbol "case")
---     reserved "default"
---     def <- statements
---     reserved "break"
---     return $ Switch var list def
-
 whileStmt :: Parser Stmt
 whileStmt =
   do ref <- indentationBlock
@@ -324,15 +303,23 @@ assignStmt :: Parser Stmt
 assignStmt =
   do var  <- identifier
      reservedOp "="
-     expr <- expression 
+     expr <- expression
      return $ Assign var expr
 
 samplingStmt :: Parser Stmt
 samplingStmt =
   do var <- identifier
      reservedOp "<-"
-     (Var dist) <- expression
-     return $ Assign var (Var dist)
+     expr <- expression
+     return $ Sampling var expr
+
+supportStmt :: Parser Stmt
+supportStmt =
+  do var <- identifier
+     reservedOp "="
+     reserved "set"
+     expr <- expression
+     return $ Support var expr
 
 skipStmt :: Parser Stmt
 skipStmt = reserved "skip" >> return Skip
@@ -369,7 +356,11 @@ eOperators =
            Infix  (reservedOp "+"   >> return (ABinary Add     )) AssocLeft,
            Infix  (reservedOp "%"   >> return (ABinary Rem     )) AssocLeft,
            Infix  (reservedOp "^"   >> return (ABinary Pow     )) AssocLeft,
+           Infix  (reservedOp "&"   >> return (ABinary Intersection)) AssocLeft,
            Infix  (reservedOp "-"   >> return (ABinary Subtract)) AssocLeft]
+        , [Infix  (reservedOp "in"  >> return (SBinary In        )) AssocLeft,
+           Infix  (reservedOp "nin"  >> return (SBinary NIn      )) AssocLeft,
+           Infix  (reservedOp "isSub"  >> return (SBinary IsSubOf)) AssocLeft]
         , [Infix  (reservedOp "&&"  >> return (BBinary And     )) AssocLeft,
            Infix  (reservedOp "||"  >> return (BBinary Or      )) AssocLeft]
         , [Infix  (kChoice Ichoice)                               AssocLeft]
@@ -380,7 +371,6 @@ eOperators =
         , [Infix  (reservedOp "=="  >> return (RBinary Eq)      ) AssocLeft] 
         , [Infix  (reservedOp "!="  >> return (RBinary Ne)      ) AssocLeft]
         , [Infix  (reservedOp "@"   >> return Tuple             ) AssocLeft]
---        , [Infix  (reservedOp "::"  >> return Case              ) AssocLeft] 
         ]
 
 eTerm :: Parser Expr
@@ -395,13 +385,9 @@ eTerm = (parens expression
         <|> try uniformIchoicesListComp
         <|> try notUniformIchoices
         <|> geometricIchoices
---        <|> switchExpr
         <|> (liftM RationalConst (try decimalRat) <?> "rat")
         <|> (liftM Var identifier <?> "var")
         <?> "eTerm") << whiteSpace
-
-
-
 
 elseExpr :: Parser (Expr,Expr)
 elseExpr =
@@ -452,29 +438,6 @@ ifExpr =
   do (cond, exprIf) <- ifCondExpr
      exprElse <- getIfBlockExpr (checkExprEnd cond)
      return $ ExprIf cond exprIf exprElse
-
---ifExpr =
---  do reserved "if"
---     cond <- expression
---     reserved "then"
---     expr1 <- expression
---     reserved "else"
---     expr2 <- expression
---     reserved "fi"
---     return $ ExprIf cond expr1 expr2
---   <?> "if-expr"
-
---switchExpr =
---  do reserved "switch"
---     var <- expression
---     reserved "then"
---     reserved "case"
---     list <- sepBy expression (symbol "case")
---     reserved "default"
---     def <- expression
---     reserved "break"
---     return $ ExprSwitch var list def
---  <?> "switch-expr"
 
 uniformIchoices = 
         do reserved "uniform"

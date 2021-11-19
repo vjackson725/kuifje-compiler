@@ -46,17 +46,33 @@ aOperatorWarpper op (S x) (S y) =
         case op of 
           Add      -> S $ DSET.union x y
           Subtract -> S $ x DSET.\\ y
+          Intersection -> S $ DSET.intersection x y
           otherwise -> error "Unknow set operation"
 
 aOperator op d1 d2 = 
   D $ fromListWith (+) [((aOperatorWarpper op x y), p * q) | (x, p) <- toList $ runD d1,
                                                              (y, q) <- toList $ runD d2]
-cOperator op d1 d2 = 
+cOperator op d1 d2 =
   D $ fromListWith (+) [((B (op x y)), p * q) | (R x, p) <- toList $ runD d1,
                                                 (R y, q) <- toList $ runD d2]
 bOperator op d1 d2 = 
   D $ fromListWith (+) [((B (op x y)), p * q) | (B x, p) <- toList $ runD d1,
                                                 (B y, q) <- toList $ runD d2]
+
+sBinOperatorWrapper op (S x) (S y) =
+  case op of
+    IsSubOf   -> DSET.isSubsetOf x y
+    otherwise -> error "Unknow set membership operation"
+
+sBinOperatorWrapper op x (S y) =
+  case op of
+    In       -> DSET.member x y
+    NIn      -> DSET.notMember x y
+    otherwise -> error "Unknow set membership operation"
+
+sBinOperator op d1 d2 =
+  D $ fromListWith (+) [((B (sBinOperatorWrapper op x y)), p * q) | (x, p) <- toList $ runD d1,
+                                                                    (y, q) <- toList $ runD d2]
 
 evalE :: Expr -> (Gamma ~> Value)
 evalE (Var id) = \s -> case E.lookup s id of 
@@ -103,33 +119,21 @@ evalE (Tuple e p) = \s ->
               $ toList $ runD $ (evalE p) s
       d = D $ Data.Map.Strict.map (*p') $ runD e'
    in D $ (runD d)
---evalTList (Tuple _ p) = p
---evalTList (INUchoices ls) =
---  if length ls == 1
---     then evalTList $ head ls
---     else \s ->
---        let e1' = (evalTList $ head ls) s
---            e2' = (evalE $ INUchoices (tail ls)) s
---         in e1' + e2'
 evalE (INUchoices ls) =
   if (evalTList $ INUchoices ls) == 1.0
      then evalNUList $ INUchoices ls
      else error ("Probability adds up to: " ++ 
           (show (evalTList $ INUchoices ls)) ++
           " --> It should be 1.0" )
-
---evalE (INUchoices ls) =
---  if length ls == 1
---     then evalE $ head ls
---     else \s ->
---        let e1' = (evalE $ head ls) s
---            e2' = (evalE $ INUchoices (tail ls)) s
---         in D $ unionWith (+) (runD e1') (runD e2')
 evalE (BoolConst b) = \s -> return (B b)
 evalE (Not b) = \s -> 
         let r' = (evalE b) s 
          in (fmap (\bv -> case bv of 
                             (B b') -> B (not b'))) r'
+evalE (SBinary op e1 e2) = \s ->
+  let e1' = (evalE e1) s
+      e2' = (evalE e2) s in
+      sBinOperator op e1' e2'
 evalE (BBinary op e1 e2) = \s -> 
   let e1' = (evalE e1) s
       e2' = (evalE e2) s in 
@@ -177,29 +181,6 @@ evalE (Geometric alpha low start high) =
              sProbs = sum probs
              resultDist = buildDist values probs
          in evalNUList $ INUchoices resultDist
---evalE (ExprSwitch var ls def) = 
---  if length ls == 0
---      then evalE $ def
---      else \s ->
---         let val = head (evalCase (head ls))
---             e1 = head (tail (evalCase (head ls)))
---             cond = ((RBinary Eq) var val)
---             cond' = runD $ (evalE cond) s
---             e1' = (evalE e1) s
---             e2' = (evalE $ ExprSwitch var (tail ls) def) s
---             d1 = case Data.Map.Strict.lookup (B True) cond' of
---                    (Just p)  -> D $ Data.Map.Strict.map (*p) $ runD e1'
---                    otherwise -> D $ Data.Map.Strict.empty
---             d2 = case Data.Map.Strict.lookup (B False) cond' of
---                    (Just p)  -> D $ Data.Map.Strict.map (*p) $ runD e2'
---                    otherwise -> D $ Data.Map.Strict.empty
---             in D $ unionWith (+) (runD d1) (runD d2)
---evalE (Case val e) =
---  evalE $ e
-
---evalCase :: Expr -> [Expr]
---evalCase (Case val e) = 
---  [val, e]
 
 buildDist :: [Integer] -> [Rational] -> [Expr]
 buildDist [] [] = []
@@ -230,6 +211,14 @@ evalTList (INUchoices ls) =
       tl = (evalTList $ INUchoices (tail ls))
   in hd + tl
 
+recoverIChoicesValues :: Expr -> [Expr]
+recoverIChoicesValues (RationalConst x) = [(RationalConst x)]
+recoverIChoicesValues (Ichoice v1 v2 _) =
+  let hd = (recoverIChoicesValues v1)
+      tl = (recoverIChoicesValues v2)
+   in hd ++ tl
+recoverIChoicesValues x = error ("Distribution to Value fail to:\n" ++ (show x) ++ "\n\n")
+
 evalNUList (INUchoices ls) =
   if length ls == 1
      then evalE $ head ls
@@ -238,51 +227,74 @@ evalNUList (INUchoices ls) =
             e2' = (evalNUList $ INUchoices (tail ls)) s
          in D $ unionWith (+) (runD e1') (runD e2')
 
+fromJustExpr :: Maybe Expr -> Expr
+fromJustExpr (Just a) = a
+fromJustExpr Nothing = error "Function not found."
 
-translateKuifje :: Stmt -> Map.Map String (Stmt, [String], [Expr]) -> (Kuifje Gamma, Map.Map String (Stmt, [String], [Expr]) )
-translateKuifje (Seq []) fBody = (skip, fBody)
-translateKuifje (Seq ls) fBody = 
-        let (hdRes, newFBody) = (translateKuifje (head ls) fBody)
-        in (hdRes, newFBody) <> translateKuifje (Seq (tail ls)) newFBody
-translateKuifje (Assign id expr) fBody = (Language.Kuifje.Syntax.update (\s ->
-        let currS = (evalE expr) s in
-            fmap (\r -> E.add s (id, r)) currS), fBody)
-translateKuifje (Kuifje.Syntax.While e s) fBody = 
+getCntxExpr :: String -> Map.Map String Expr -> Expr
+getCntxExpr id fCntx = fromJustExpr (Map.lookup id fCntx)
+
+--translateKuifje :: Stmt -> Map.Map String (Stmt, [String], [Expr]) -> Map.Map String Expr -> Map.Map String String -> (Kuifje Gamma, Map.Map String (Stmt, [String], [Expr]), Map.Map String Expr, Map.Map String String)
+translateKuifje :: Stmt -> Map.Map String (Stmt, [String], [Expr]) -> Map.Map String Expr -> (Kuifje Gamma, Map.Map String (Stmt, [String], [Expr]), Map.Map String Expr)
+translateKuifje (Seq []) fBody fCntx = (skip, fBody, fCntx)
+translateKuifje (Seq ls) fBody fCntx = 
+        let (hdRes, newFBody, newFCntx) = (translateKuifje (head ls) fBody fCntx)
+        in (hdRes, newFBody, newFCntx) <> translateKuifje (Seq (tail ls)) newFBody newFCntx
+translateKuifje (Assign id expr) fBody fCntx = 
+        let newFCntx = Map.insert id expr fCntx
+            updated = (Language.Kuifje.Syntax.update (\s ->
+              let currS = (evalE expr) s in
+              fmap (\r -> E.add s (id, r)) currS), fBody, newFCntx)
+            in updated
+translateKuifje (Sampling id (Var idexp)) fBody fCntx =
+        let expr = getCntxExpr idexp fCntx
+            newFCntx = Map.insert id expr fCntx
+            updated = (Language.Kuifje.Syntax.update (\s ->
+              let currS = (evalE expr) s in
+              fmap (\r -> E.add s (id, r)) currS), fBody, newFCntx)
+            in updated
+translateKuifje (Sampling id expr) fBody fCntx = 
+        let newFCntx = Map.insert id expr fCntx
+            updated = (Language.Kuifje.Syntax.update (\s ->
+              let currS = (evalE expr) s in
+              fmap (\r -> E.add s (id, r)) currS), fBody, newFCntx)
+            in updated
+--(Language.Kuifje.Syntax.update (\s ->
+--        let currS = (evalE expr) s in
+--            fmap (\r -> E.add s (id, r)) currS), fBody, fCntx)
+translateKuifje (Support id (Var idexp)) fBody fCntx =
+        let expr = getCntxExpr idexp fCntx
+            list = recoverIChoicesValues expr
+            values = DSET.fromList list
+            setExpr = (Eset values)
+            in translateKuifje (Assign id setExpr) fBody fCntx
+translateKuifje (Kuifje.Syntax.While e s) fBody fCntx = 
         (Language.Kuifje.Syntax.while (\s -> 
                 let currS = (evalE e) s in 
-                    fmap (\r -> case r of (B b) -> b) currS) (fst (translateKuifje s fBody)), fBody)
-translateKuifje (Kuifje.Syntax.If e s1 s2) fBody = 
+                    fmap (\r -> case r of (B b) -> b) currS) (fst3 (translateKuifje s fBody fCntx)), fBody, fCntx)
+translateKuifje (Kuifje.Syntax.If e s1 s2) fBody fCntx = 
         (Language.Kuifje.Syntax.cond 
           (\s -> let currS = (evalE e) s in fmap (\r -> case r of (B b) -> b) currS) 
-          (fst (translateKuifje s1 fBody)) 
-          (fst (translateKuifje s2 fBody)), fBody)
-translateKuifje Kuifje.Syntax.Skip fBody = (skip, fBody)
-translateKuifje (Leak e) fBody = (observe (evalE e), fBody)
-translateKuifje (Vis s) fBody = (undefined, fBody)
-translateKuifje (Echoice s1 s2 p) fBody = 
+          (fst3 (translateKuifje s1 fBody fCntx)) 
+          (fst3 (translateKuifje s2 fBody fCntx)), fBody, fCntx)
+translateKuifje Kuifje.Syntax.Skip fBody fCntx = (skip, fBody, fCntx)
+translateKuifje (Leak e) fBody fCntx = (observe (evalE e), fBody, fCntx)
+translateKuifje (Vis s) fBody fCntx = (undefined, fBody, fCntx)
+translateKuifje (Echoice s1 s2 p) fBody fCntx = 
          (Language.Kuifje.Syntax.cond 
           (\s -> let p' = (evalE (Ichoice (BoolConst True) (BoolConst False) p) s) 
                   in (fmap (\r -> case r of (B b) -> b)) p') 
-          (fst (translateKuifje s1  fBody)) 
-          (fst (translateKuifje s2 fBody)), fBody)
---translateKuifje (CaseStmt exp stmt) fBody =
---          translateKuifje stmt fBody
---translateKuifje (Switch var list def) fBody =
---        if length list == 0
---        then (translateKuifje def fBody)
---        else (Language.Kuifje.Syntax.cond
---          (\s -> let currS = (evalE ((RBinary Eq) var (evalCaseStmt (head list)))) s in fmap (\r -> case r of (B b) -> b) currS)
---          (fst (translateKuifje (head list) fBody))
---          (fst (translateKuifje (Switch var (tail list) def) fBody)), fBody)
-translateKuifje (FuncStmt name body lInput) fBody = 
+          (fst3 (translateKuifje s1 fBody fCntx)) 
+          (fst3 (translateKuifje s2 fBody fCntx)), fBody, fCntx)
+translateKuifje (FuncStmt name body lInput) fBody fCntx = 
           let (Seq ls) = body
               lOutput = findReturns ls
               nMap = Map.insert name (body, lInput, lOutput) fBody 
-              stmt = fst (translateKuifje (Kuifje.Syntax.Skip) fBody)
-          in (stmt, nMap)
+              stmt = fst3 (translateKuifje (Kuifje.Syntax.Skip) fBody fCntx)
+          in (stmt, nMap, fCntx)
 -- Returns were processed by FuncStmt, and should be skiped at this point:
-translateKuifje (ReturnStmt outputs) fBody = (skip, fBody)
-translateKuifje (CallStmt name lInput lOutput) fBody =
+translateKuifje (ReturnStmt outputs) fBody fCntx = (skip, fBody, fCntx)
+translateKuifje (CallStmt name lInput lOutput) fBody fCntx =
           let base = (getFuncBody name fBody)
               baseStmt = fst3 base
               fInput = snd3 base
@@ -290,7 +302,7 @@ translateKuifje (CallStmt name lInput lOutput) fBody =
               baseUpdated = updateStmtUses name baseStmt
               outCntxStmt = addOutputCntx name fOutput lOutput baseUpdated
               inCntxStmt = addInputCntx name fInput lInput outCntxStmt
-          in translateKuifje inCntxStmt fBody
+          in translateKuifje inCntxStmt fBody fCntx
 
 isReturnStmt :: Stmt -> Bool
 isReturnStmt (ReturnStmt _) = True
@@ -391,16 +403,7 @@ updateExpression fName (RBinary op e1 e2) =
          newe2 = (updateExpression fName e2)
      in (RBinary op newe1 newe2)
 -- Support to Set not provided.
---updateExpression fName (ExprSwitch var [] def) =
---     let newvar = (updateExpression fName var)
---     in (ExprSwitch newvar [] def)
---updateExpression fName (ExprSwitch var ls def) =
---     let hd = (updateExpression fName (head ls))
---         tl = (updateExpression fName (ExprSwitch var (tail ls) def))
---         (ExprSwitch newvar list newdef) = tl
---     in (ExprSwitch newvar (hd : list) newdef)
 updateExpression fName e = e
-
 updateStmtList :: String -> [Stmt] -> [Stmt]
 updateStmtList fName [] = []
 updateStmtList fName ls = (updateStmtUses fName (head ls)) : (updateStmtList fName (tail ls))
@@ -442,6 +445,18 @@ snd3 (_, x, _) = x
 trd3 :: (a, b, c) -> c
 trd3 (_, _, x) = x
 
+fst4 :: (a, b, c, d) -> a
+fst4 (x, _, _, _) = x
+
+snd4 :: (a, b, c, d) -> b
+snd4 (_, x, _, _) = x
+
+trd4 :: (a, b, c, d) -> c
+trd4 (_, _, x, _) = x
+
+frt4 :: (a, b, c, d) -> d
+frt4 (_, _, _, x) = x
+
 fromJust :: Maybe (Stmt, [String], [Expr]) -> (Stmt, [String], [Expr])
 fromJust (Just a) = a
 fromJust Nothing = error "Function not found."
@@ -464,7 +479,7 @@ initGamma x y = let g = E.add E.empty ("x", (R x)) in
                E.add g ("y", (R y))
 
 hyper :: Dist (Dist Rational)
-hyper = let g = fst (translateKuifje exampelS Map.empty)
+hyper = let g = fst3 (translateKuifje exampelS Map.empty Map.empty)
          in project $ hysem g (uniform [E.empty])
 
 example :: String

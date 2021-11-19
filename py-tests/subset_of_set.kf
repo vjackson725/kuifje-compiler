@@ -1,0 +1,5 @@
+x = set {1, 2, 3};
+y = set {2, 3};
+z = set {3, 4};
+q1 = y isSub x;
+q2 = z isSub x;

@@ -26,7 +26,8 @@ project var = fmap (fmap (\s -> getFrom s var))
 
 runHyper s = do tmp <- parseFile s
                 let m = Map.empty
-                let g = fst (translateKuifje tmp m)
+                let e = Map.empty
+                let g = fst3 (translateKuifje tmp m e)
                 let kuifje = hysem g (uniform [E.empty])
                 let (env, _) = (toList $ runD kuifje) !! 0
                 let (gamma, _) = ((toList $ runD $ env) !! 0)

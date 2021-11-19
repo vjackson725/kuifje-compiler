@@ -11,7 +11,12 @@ import Data.Set
 newtype ExprSet = Set Expr deriving (Show)
 
 data BBinOp = And 
-            | Or 
+            | Or
+            deriving (Show, Ord, Eq)
+ 
+data SBinOp = In
+            | NIn
+            | IsSubOf
             deriving (Show, Ord, Eq)
 
 data RBinOp = Gt 
@@ -40,13 +45,12 @@ data Expr = Var String
           | BoolConst Bool
           | Not Expr 
           | BBinary BBinOp Expr Expr 
-          | RBinary RBinOp Expr Expr 
+          | RBinary RBinOp Expr Expr
+          | SBinary SBinOp Expr Expr
 
           -- Extension
           | ExprIf Expr Expr Expr
           | Eset (Set Expr)
- --         | Case Expr Expr
---          | ExprSwitch Expr [Expr] Expr
           | Geometric Expr Expr Expr Expr
           deriving (Show, Eq, Ord)
 
@@ -57,17 +61,18 @@ data ABinOp = Add
             | Pow
             | IDivide 
             | Rem
+            | Intersection
             deriving (Show, Ord, Eq)
 
 data Stmt = Seq [Stmt]
           | Assign String Expr
+          | Sampling String Expr
           | If Expr Stmt Stmt
           | While Expr Stmt
           | FuncStmt String Stmt [String] --[Expr]
           | ReturnStmt [Expr]
           | CallStmt String [Expr] [String]
---          | Switch Expr [Stmt] Stmt
---          | CaseStmt Expr Stmt
+          | Support String Expr
           | Skip 
           | Leak Expr
           | Vis String

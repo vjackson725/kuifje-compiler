@@ -1,0 +1,5 @@
+p <- uniform[0,1];
+x = p;
+y = p;
+z = if x == y: 1 else: 0;
+leak(z);

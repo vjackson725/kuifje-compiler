@@ -1,0 +1,3 @@
+x = set {1, 2, 3};
+y = 2 nin x;
+z = 4 nin x;
