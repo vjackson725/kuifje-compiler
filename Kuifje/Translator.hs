@@ -268,6 +268,11 @@ translateKuifje (Support id (Var idexp)) fBody fCntx =
             values = DSET.fromList list
             setExpr = (Eset values)
             in translateKuifje (Assign id setExpr) fBody fCntx
+translateKuifje (Support id exp) fBody fCntx =
+        let list = recoverIChoicesValues exp
+            values = DSET.fromList list
+            setExpr = (Eset values)
+            in translateKuifje (Assign id setExpr) fBody fCntx
 translateKuifje (Kuifje.Syntax.While e s) fBody fCntx = 
         (Language.Kuifje.Syntax.while (\s -> 
                 let currS = (evalE e) s in 
