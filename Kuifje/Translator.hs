@@ -234,6 +234,98 @@ fromJustExpr Nothing = error "Function not found."
 getCntxExpr :: String -> Map.Map String Expr -> Expr
 getCntxExpr id fCntx = fromJustExpr (Map.lookup id fCntx)
 
+lValuesTolExpr :: [Value] -> [Expr]
+lValuesTolExpr [] = []
+lValuesTolExpr ls =
+        let hd = valueToExpr (head ls)
+            tl = lValuesTolExpr (tail ls)
+         in hd : tl
+
+valueToExpr :: Value -> Expr
+valueToExpr (R r) = (RationalConst r)
+valueToExpr (B b) = (BoolConst b)
+valueToExpr (S s) = 
+        let e = DSET.elems s
+            l = lValuesTolExpr e
+            ns = DSET.fromList l
+         in (Eset ns)
+
+valuesToExprList :: [(Value, Rational)] -> [Expr]
+valuesToExprList [] = []
+valuesToExprList ls =
+        let hd = head ls
+            exp = valueToExpr (fst hd)
+            --prob = snd hd
+            tl = valuesToExprList (tail ls)
+         in exp : tl
+
+getSupportList :: [(Dist Value)] -> [Expr]
+getSupportList [] = []
+getSupportList ls = 
+        let hd = assocs (unpackD (head ls))
+            newHd = valuesToExprList hd 
+            tl = getSupportList (tail ls)
+         in newHd ++ tl
+
+getSupportDist :: [((Dist Value), Rational)] -> [(Expr, Rational)]
+getSupportDist [] = []
+getSupportDist ls =
+        let hd = head ls
+            exp = valuesToExprList (assocs (unpackD (fst hd)))
+            newExp = (Eset (DSET.fromList exp))
+            prob = snd hd
+            tl = getSupportDist (tail ls)
+         in (newExp, prob) : tl
+
+getSupportFromHyper :: Dist (Dist Value) -> [(Expr, Rational)]
+getSupportFromHyper d =
+        let mp = unpackD d
+         in getSupportDist (assocs mp)
+
+recoverSupportAsDistList :: [(Expr, Rational)] -> [Expr]
+recoverSupportAsDistList [] = []
+recoverSupportAsDistList ls = 
+        let (e, r) = (head ls)
+            p = (RationalConst r) 
+            tp = (Tuple e p)
+            tl = recoverSupportAsDistList (tail ls)
+          in tp : tl
+
+getFromDist g s | Just x <- E.lookup g s = x
+                | otherwise = error ("Not going to happend " ++ s)
+
+exec :: String -> Dist (Dist Gamma) -> Dist (Dist Value)
+exec var = fmap (fmap (\s -> getFromDist s var))
+
+createMonnad :: [Kuifje Gamma] -> Kuifje Gamma
+createMonnad [] = skip
+createMonnad ls = 
+        let hd = head ls
+            tl = createMonnad (tail ls)
+            in hd <> tl
+
+translateExecKuifje :: Stmt -> Map.Map String (Stmt, [String], [Expr]) -> Map.Map String Expr -> [Kuifje Gamma] -> ([Kuifje Gamma], Map.Map String (Stmt, [String], [Expr]), Map.Map String Expr)
+translateExecKuifje (Seq []) fBody fCntx list = ([skip], fBody, fCntx)
+translateExecKuifje (Seq ls) fBody fCntx list = 
+        let (hdRes, hdFBody, hdFCntx) = (translateExecKuifje (head ls) fBody fCntx list)
+            (tlRes, tlFBody, tlFCntx) = (translateExecKuifje (Seq (tail ls)) hdFBody hdFCntx hdRes)
+            in ((hdRes ++ tlRes), tlFBody, tlFCntx)
+translateExecKuifje (Support id (Var idexp)) fBody fCntx list =
+        let gammaL = createMonnad list
+            kuifje = hysem gammaL (uniform [E.empty])
+            executed = exec idexp kuifje
+            support = getSupportFromHyper executed
+            dist = recoverSupportAsDistList support
+            setExpr = (INUchoices dist)
+            (newRes, newFBody, newFCntx) = translateExecKuifje (Assign id setExpr) fBody fCntx list
+         in (newRes, newFBody, newFCntx)
+translateExecKuifje (Support id exp) fBody fCntx list =
+        let distName = "DIST." ++ id
+            (newRes, newFBody, newFCntx) = translateExecKuifje (Assign distName exp) fBody fCntx list
+         in translateExecKuifje (Support id (Var distName)) newFBody newFCntx newRes
+translateExecKuifje inst fBody fCntx list = 
+        let (rRes, rFBody, rFCntx) = translateKuifje inst fBody fCntx
+         in ((list ++ [rRes]), rFBody, rFCntx)
 --translateKuifje :: Stmt -> Map.Map String (Stmt, [String], [Expr]) -> Map.Map String Expr -> Map.Map String String -> (Kuifje Gamma, Map.Map String (Stmt, [String], [Expr]), Map.Map String Expr, Map.Map String String)
 translateKuifje :: Stmt -> Map.Map String (Stmt, [String], [Expr]) -> Map.Map String Expr -> (Kuifje Gamma, Map.Map String (Stmt, [String], [Expr]), Map.Map String Expr)
 translateKuifje (Seq []) fBody fCntx = (skip, fBody, fCntx)
