@@ -27,17 +27,13 @@ project var = fmap (fmap (\s -> getFrom s var))
 runHyper s = do tmp <- parseFile s
                 let m = Map.empty
                 let e = Map.empty
-                --let g = fst3 (translateKuifje tmp m e)
                 let l = fst3 (translateExecKuifje tmp m e [])
                 let g = createMonnad l 
                 let kuifje = hysem g (uniform [E.empty])
                 let (env, _) = (toList $ runD kuifje) !! 0
                 let (gamma, _) = ((toList $ runD $ env) !! 0)
                 let all_var = E.allVar gamma
-                --error ("\nVars are:\n" ++ (show all_var) ++ "\n")
                 outputL [(x, Kuifje.Run.project x kuifje) | x <- all_var]
-
-
 
 outputL :: (Ord a, Boxable a) => [(String, Hyper a)] -> IO ()
 outputL ls =
