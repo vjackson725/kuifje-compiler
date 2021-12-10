@@ -1,0 +1,5 @@
+a = (1 [1/2] (3 [1/3] 4));
+leak(a);
+supA = set a;
+supSupA = set supA;
+supSupSupA = set supSupA;

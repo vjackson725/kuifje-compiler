@@ -1,0 +1,11 @@
+prob = (1 [1/3] 2);
+prob01 <- prob;
+
+def f1(p):
+  x = p + 3;
+  y = x / 2;
+  w = set y;
+  return w;
+
+b = f1(prob01);
+leak(b);

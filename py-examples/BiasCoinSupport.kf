@@ -4,5 +4,7 @@ while i < 2:
    result = 0 [p] 1;
    leak(result);
    i = i + 1;
-w = set result;
-z = set p;
+
+supResult = set result;
+supSupResult = set supResult;
+supP = set p;

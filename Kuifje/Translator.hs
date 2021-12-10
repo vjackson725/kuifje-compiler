@@ -197,7 +197,6 @@ calcGeom :: Double -> Integer -> Integer -> Rational
 calcGeom alpha start n = realToFrac (((1 - alpha) / (1 + alpha)) * (alpha^(abs (n - start))))
 
 evalTList :: Expr -> Double
---error ("Value is " ++ (show p))
 evalTList (RationalConst a) = (fromRat a)
 evalTList (Neg a) = -1 * (evalTList a)
 evalTList (ABinary Divide a b) = 
@@ -255,7 +254,6 @@ valuesToExprList [] = []
 valuesToExprList ls =
         let hd = head ls
             exp = valueToExpr (fst hd)
-            --prob = snd hd
             tl = valuesToExprList (tail ls)
          in exp : tl
 
@@ -323,10 +321,27 @@ translateExecKuifje (Support id exp) fBody fCntx list =
         let distName = "DIST." ++ id
             (newRes, newFBody, newFCntx) = translateExecKuifje (Assign distName exp) fBody fCntx list
          in translateExecKuifje (Support id (Var distName)) newFBody newFCntx newRes
+translateExecKuifje (FuncStmt name body lInput) fBody fCntx list =
+          let (Seq ls) = body
+              lOutput = findReturns ls
+              nMap = Map.insert name (body, lInput, lOutput) fBody
+              stmt = fst3 (translateExecKuifje (Kuifje.Syntax.Skip) fBody fCntx list)
+          in ((list ++ stmt), nMap, fCntx)
+-- Returns were processed by FuncStmt, and should be skiped at this point:
+translateExecKuifje (ReturnStmt outputs) fBody fCntx list = ((list ++ [skip]), fBody, fCntx)
+translateExecKuifje (CallStmt name lInput lOutput) fBody fCntx list =
+          let base = (getFuncBody name fBody)
+              baseStmt = fst3 base
+              fInput = snd3 base
+              fOutput = trd3 base
+              baseUpdated = updateStmtUses name baseStmt
+              outCntxStmt = addOutputCntx name fOutput lOutput baseUpdated
+              inCntxStmt = addInputCntx name fInput lInput outCntxStmt
+          in translateExecKuifje inCntxStmt fBody fCntx list
 translateExecKuifje inst fBody fCntx list = 
         let (rRes, rFBody, rFCntx) = translateKuifje inst fBody fCntx
          in ((list ++ [rRes]), rFBody, rFCntx)
---translateKuifje :: Stmt -> Map.Map String (Stmt, [String], [Expr]) -> Map.Map String Expr -> Map.Map String String -> (Kuifje Gamma, Map.Map String (Stmt, [String], [Expr]), Map.Map String Expr, Map.Map String String)
+
 translateKuifje :: Stmt -> Map.Map String (Stmt, [String], [Expr]) -> Map.Map String Expr -> (Kuifje Gamma, Map.Map String (Stmt, [String], [Expr]), Map.Map String Expr)
 translateKuifje (Seq []) fBody fCntx = (skip, fBody, fCntx)
 translateKuifje (Seq ls) fBody fCntx = 
@@ -354,17 +369,17 @@ translateKuifje (Sampling id expr) fBody fCntx =
 --(Language.Kuifje.Syntax.update (\s ->
 --        let currS = (evalE expr) s in
 --            fmap (\r -> E.add s (id, r)) currS), fBody, fCntx)
-translateKuifje (Support id (Var idexp)) fBody fCntx =
-        let expr = getCntxExpr idexp fCntx
-            list = recoverIChoicesValues expr
-            values = DSET.fromList list
-            setExpr = (Eset values)
-            in translateKuifje (Assign id setExpr) fBody fCntx
-translateKuifje (Support id exp) fBody fCntx =
-        let list = recoverIChoicesValues exp
-            values = DSET.fromList list
-            setExpr = (Eset values)
-            in translateKuifje (Assign id setExpr) fBody fCntx
+--translateKuifje (Support id (Var idexp)) fBody fCntx =
+--        let expr = getCntxExpr idexp fCntx
+--            list = recoverIChoicesValues expr
+--            values = DSET.fromList list
+--            setExpr = (Eset values)
+--            in translateKuifje (Assign id setExpr) fBody fCntx
+--translateKuifje (Support id exp) fBody fCntx =
+--        let list = recoverIChoicesValues exp
+--            values = DSET.fromList list
+--            setExpr = (Eset values)
+--            in translateKuifje (Assign id setExpr) fBody fCntx
 translateKuifje (Kuifje.Syntax.While e s) fBody fCntx = 
         (Language.Kuifje.Syntax.while (\s -> 
                 let currS = (evalE e) s in 
@@ -453,9 +468,11 @@ updateVarToCntx :: String -> Expr -> Expr
 updateVarToCntx fName (Var id) = (Var (fName ++ "." ++ id))
 -- (addOutputCntx fName (tail fOutputs) (tail cOutputs) nStmt)
 
-updateAssingment :: String -> Stmt -> Stmt
-updateAssingment fName (Assign id expr) = (Assign (fName ++ "." ++ id) expr)
-updateAssingment fName e = e
+updateID :: String -> Stmt -> Stmt
+updateID fName (Assign id expr) = (Assign (fName ++ "." ++ id) expr)
+updateID fName (Sampling id expr) = (Sampling (fName ++ "." ++ id) expr)
+updateID fName (Support id expr) = (Support (fName ++ "." ++ id) expr)
+updateID fName e = e
 
 updateExpression :: String -> Expr -> Expr
 updateExpression fName (Var id) = (Var (fName ++ "." ++ id))
@@ -514,7 +531,7 @@ updateStmtUses fName (Seq ls) =
      in (Seq (hd : list))
 updateStmtUses fName (Assign id expr) = 
      let newexpr = (updateExpression fName expr)
-     in (updateAssingment fName (Assign id newexpr))
+     in (updateID fName (Assign id newexpr))
 updateStmtUses fName (Kuifje.Syntax.While e s) = 
      (Kuifje.Syntax.While (updateExpression fName e) (updateStmtUses fName s)) 
 updateStmtUses fName (Kuifje.Syntax.If e s1 s2) =
@@ -522,15 +539,12 @@ updateStmtUses fName (Kuifje.Syntax.If e s1 s2) =
 updateStmtUses fName (Leak e) = (Leak (updateExpression fName e))
 updateStmtUses fName (Echoice s1 s2 p) =
      (Echoice (updateStmtUses fName s1) (updateStmtUses fName s2) (updateExpression fName p))
---updateStmtUses fName (CaseStmt exp stmt) =
---     (CaseStmt (updateExpression fName exp) (updateStmtUses fName stmt))
---updateStmtUses fName (Switch var [] def) =
---     (Switch (updateExpression fName var) [] (updateStmtUses fName def)) 
---updateStmtUses fName (Switch var ls def) =
---     let newVar = (updateExpression fName var)
---         newDef = (updateStmtUses fName  def)
---         newLs = (updateStmtList fName ls)
---     in (Switch newVar newLs newDef)
+updateStmtUses fName (Sampling id expr) =
+     let newexpr = (updateExpression fName expr)
+     in (updateID fName (Sampling id newexpr))
+updateStmtUses fName (Support id expr) =       
+     let newexpr = (updateExpression fName expr)
+     in (updateID fName (Support id newexpr))
 updateStmtUses fName stmt = stmt
 
 fst3 :: (a, b, c) -> a
