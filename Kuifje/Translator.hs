@@ -273,7 +273,10 @@ getSupportDist ls =
             newExp = (Eset (DSET.fromList exp))
             prob = snd hd
             tl = getSupportDist (tail ls)
-         in (newExp, prob) : tl
+         --in (newExp, prob) : tl
+         in if length exp == 1
+            then ((head exp), prob) : tl
+            else (newExp, prob) : tl
 
 getSupportFromHyper :: Dist (Dist Value) -> [(Expr, Rational)]
 getSupportFromHyper d =
