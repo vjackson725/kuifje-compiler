@@ -435,11 +435,11 @@ livenessAnalysis (W e b) vars =
             (bVal, bVars) = livenessAnalysis b vars
          in ((eVal && bVal), bVars)
 
---runLivenessAnalysis :: MonadValue -> Bool
---runLivenessAnalysis m =  
---         if (fst (livenessAnalysis m Map.empty)) == False then
---           error ("\n\nInvalid Program. Use of undeclared variable.\n No debug information found.\n")
---         else True
+runLivenessAnalysis :: MonadValue -> Bool
+runLivenessAnalysis m =  
+         if (fst (livenessAnalysis m Map.empty)) == False then
+           error ("\n\nInvalid Program. Use of undeclared variable.\n No debug information found.\n")
+         else True
 
 translateExecKuifje :: Stmt -> Map.Map String (Stmt, [String], [Expr]) -> Map.Map String Expr -> MonadValue -> (MonadValue, Map.Map String (Stmt, [String], [Expr]), Map.Map String Expr)
 translateExecKuifje (Seq []) fBody fCntx list = ((M skip), fBody, fCntx)

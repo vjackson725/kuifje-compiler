@@ -190,7 +190,7 @@ elifCondStmt =
       
 checkIndent :: Expr -> Internal.Indentation -> Internal.Indentation -> Bool
 checkIndent expr ref pos = 
-   if expr == (RBinary Eq  (RationalConst (1 % 1)) (RationalConst (1 % 1)))
+   if expr == (RBinary Eq (RationalConst (1 % 1)) (RationalConst (1 % 1)))
       then False
       else (isInBlock ref pos) 
 
@@ -200,7 +200,7 @@ getIfBlock :: Bool -> Internal.Indentation -> Parser Stmt
 getIfBlock False _ = return $ Skip
 getIfBlock True ref = do
       pos <- indentation
-      (cond, stmt) <- option ((RBinary Eq  (RationalConst (1 % 1)) (RationalConst (1 % 1))),Skip) (elifCondStmt <|> elseStmt)
+      (cond, stmt) <- option ((RBinary Eq (RationalConst (1 % 1)) (RationalConst (1 % 1))),Skip) (elifCondStmt <|> elseStmt)
       elseBlock <- (getIfBlock (checkIndent cond ref pos) ref)
       return $ (If cond stmt elseBlock)
 
@@ -415,28 +415,25 @@ elifCondExpr =
       input <- getInput
       return $ (cond, body)
 
-checkExprEnd :: Expr -> Bool
-checkExprEnd expr =
-   if expr == (RBinary Ne (RationalConst (1 % 1)) (RationalConst (1 % 1)))
-      then False
-      else True
-
 -- | Parses a block of lines at the same indentation level starting at the
 -- current position
-getIfBlockExpr :: Bool -> Parser Expr
--- Value assinged by default:
-getIfBlockExpr False = return $ error ("\nIf Expression does not add up to one.\n")
-getIfBlockExpr True = do
+getIfBlockExpr :: Parser Expr
+getIfBlockExpr = do
       -- Option provides a default value, that is an indetermination.
       -- If the values at this point add up to one, it will be naturally skiped.
       -- Otherwise the default value will generate an error, as the Expression does not add up to one.
       (cond, exprIf) <- option ((RBinary Ne (RationalConst (1 % 1)) (RationalConst (1 % 1))), (RationalConst (1 % 1))) (elifCondExpr <|> elseExpr) 
-      exprElse <- getIfBlockExpr (checkExprEnd cond)
-      return $ ExprIf cond exprIf exprElse
+      if cond == (RBinary Eq (RationalConst (1 % 1)) (RationalConst (1 % 1)))
+      then return $ exprIf
+      else if cond == (RBinary Ne (RationalConst (1 % 1)) (RationalConst (1 % 1)))
+           then error ("\nIf expression not in the format.\nPossible else statement missing.\n")
+           else do
+              exprElse <- getIfBlockExpr
+              return $ ExprIf cond exprIf exprElse
 
 ifExpr =
   do (cond, exprIf) <- ifCondExpr
-     exprElse <- getIfBlockExpr (checkExprEnd cond)
+     exprElse <- getIfBlockExpr
      return $ ExprIf cond exprIf exprElse
 
 uniformIchoices = 
