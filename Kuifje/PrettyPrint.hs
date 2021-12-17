@@ -24,3 +24,4 @@ instance Boxable (Env Value) where
 instance (Boxable a, Boxable b) => Boxable (Either a b) where
   toBox (Left x) = text "Left" <+> toBox x
   toBox (Right x) = text "Right" <+> toBox x
+

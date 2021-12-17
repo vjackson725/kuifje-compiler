@@ -298,19 +298,66 @@ getFromDist g s | Just x <- E.lookup g s = x
 exec :: String -> Dist (Dist Gamma) -> Dist (Dist Value)
 exec var = fmap (fmap (\s -> getFromDist s var))
 
-createMonnad :: [Kuifje Gamma] -> Kuifje Gamma
-createMonnad [] = skip
-createMonnad ls = 
-        let hd = head ls
-            tl = createMonnad (tail ls)
-            in hd <> tl
+data MonadValue = M (Kuifje Gamma)
+           | A String Expr
+           | L [MonadValue]
+           | C Expr MonadValue MonadValue
+           | E MonadValue MonadValue Expr
+           | W Expr MonadValue
 
-translateExecKuifje :: Stmt -> Map.Map String (Stmt, [String], [Expr]) -> Map.Map String Expr -> [Kuifje Gamma] -> ([Kuifje Gamma], Map.Map String (Stmt, [String], [Expr]), Map.Map String Expr)
-translateExecKuifje (Seq []) fBody fCntx list = ([skip], fBody, fCntx)
+monadType :: MonadValue -> String
+monadType (A id e) = ("Assign: " ++ id)
+monadType (M md) = ("M: Monad")
+monadType (L ls) = ("L: " ++ (show (length ls)) ++ "\n")
+monadType (C e t f) = ("C: \n  T = " ++ (monadType t) ++ "\n  F = " ++ (monadType f)) 
+monadType (E t f p) = ("E: \n  T = " ++ (monadType t) ++ "\n  F = " ++ (monadType f))
+monadType (W e b) = ("W: \n  B = " ++ (monadType b))
+
+concatMonadValues :: MonadValue -> MonadValue -> MonadValue
+concatMonadValues (L l1) (L l2) = (L (l1 ++ l2))
+concatMonadValues v (L l2) = (L ([v] ++ l2))
+concatMonadValues (L l1) v = (L (l1 ++ [v]))
+concatMonadValues v1 v2 = (L ([v1] ++ [v2]))
+
+createMonnad :: MonadValue -> Kuifje Gamma
+createMonnad (M m) = m
+createMonnad (A id e) = Language.Kuifje.Syntax.update (\s ->
+        let currS = (evalE e) s in
+            fmap (\r -> E.add s (id, r)) currS)
+createMonnad (L []) = skip
+createMonnad (L ls) = createMonnad (head ls) <> createMonnad (L (tail ls))
+createMonnad (W e ls) =
+        Language.Kuifje.Syntax.while (\s ->
+                let currS = (evalE e) s in
+                    fmap (\r -> case r of (B b) -> b) currS) (createMonnad ls)
+createMonnad (C e s1 s2) =
+        Language.Kuifje.Syntax.cond 
+          (\s -> let currS = (evalE e) s in fmap (\r -> case r of (B b) -> b) currS) 
+          -- (createMonnad s1)
+          -- (createMonnad s2)
+          --
+          -- Leaks the conditional after choose an option
+          ((createMonnad s1) <> (observe (evalE e))) 
+          ((createMonnad s2) <> (observe (evalE e)))
+createMonnad (E s1 s2 p) =
+        Language.Kuifje.Syntax.cond
+          (\s -> let p' = (evalE (Ichoice (BoolConst True) (BoolConst False) p) s)
+                  in (fmap (\r -> case r of (B b) -> b)) p')
+          (createMonnad s1)
+          (createMonnad s2)
+
+translateExecKuifje :: Stmt -> Map.Map String (Stmt, [String], [Expr]) -> Map.Map String Expr -> MonadValue -> (MonadValue, Map.Map String (Stmt, [String], [Expr]), Map.Map String Expr)
+translateExecKuifje (Seq []) fBody fCntx list = ((M skip), fBody, fCntx)
 translateExecKuifje (Seq ls) fBody fCntx list = 
         let (hdRes, hdFBody, hdFCntx) = (translateExecKuifje (head ls) fBody fCntx list)
             (tlRes, tlFBody, tlFCntx) = (translateExecKuifje (Seq (tail ls)) hdFBody hdFCntx hdRes)
-            in ((hdRes ++ tlRes), tlFBody, tlFCntx)
+            monadList = concatMonadValues hdRes tlRes 
+         in (monadList, tlFBody, tlFCntx)
+translateExecKuifje (Assign id expr) fBody fCntx list = 
+        let newFCntx = Map.insert id expr fCntx
+            monadList = concatMonadValues list (A id expr)
+         in (monadList, fBody, newFCntx)
+         --in (monadList, newFBody, newFCntxA)
 translateExecKuifje (Support id (Var idexp)) fBody fCntx list =
         let gammaL = createMonnad list
             kuifje = hysem gammaL (uniform [E.empty])
@@ -325,99 +372,50 @@ translateExecKuifje (Support id exp) fBody fCntx list =
             (newRes, newFBody, newFCntx) = translateExecKuifje (Assign distName exp) fBody fCntx list
          in translateExecKuifje (Support id (Var distName)) newFBody newFCntx newRes
 translateExecKuifje (FuncStmt name body lInput) fBody fCntx list =
-          let (Seq ls) = body
-              lOutput = findReturns ls
-              nMap = Map.insert name (body, lInput, lOutput) fBody
-              stmt = fst3 (translateExecKuifje (Kuifje.Syntax.Skip) fBody fCntx list)
-          in ((list ++ stmt), nMap, fCntx)
+        let (Seq insts) = body
+            lOutput = findReturns insts
+            nMap = Map.insert name (body, lInput, lOutput) fBody
+            stmt = fst3 (translateExecKuifje (Kuifje.Syntax.Skip) fBody fCntx list)
+            monadList = concatMonadValues list stmt
+         in (monadList, nMap, fCntx)
 -- Returns were processed by FuncStmt, and should be skiped at this point:
-translateExecKuifje (ReturnStmt outputs) fBody fCntx list = ((list ++ [skip]), fBody, fCntx)
+translateExecKuifje (ReturnStmt outputs) fBody fCntx list = (list, fBody, fCntx)
 translateExecKuifje (CallStmt name lInput lOutput) fBody fCntx list =
-          let base = (getFuncBody name fBody)
-              baseStmt = fst3 base
-              fInput = snd3 base
-              fOutput = trd3 base
-              baseUpdated = updateStmtUses name baseStmt
-              outCntxStmt = addOutputCntx name fOutput lOutput baseUpdated
-              inCntxStmt = addInputCntx name fInput lInput outCntxStmt
-          in translateExecKuifje inCntxStmt fBody fCntx list
-translateExecKuifje inst fBody fCntx list = 
-        let (rRes, rFBody, rFCntx) = translateKuifje inst fBody fCntx
-         in ((list ++ [rRes]), rFBody, rFCntx)
-
-translateKuifje :: Stmt -> Map.Map String (Stmt, [String], [Expr]) -> Map.Map String Expr -> (Kuifje Gamma, Map.Map String (Stmt, [String], [Expr]), Map.Map String Expr)
-translateKuifje (Seq []) fBody fCntx = (skip, fBody, fCntx)
-translateKuifje (Seq ls) fBody fCntx = 
-        let (hdRes, newFBody, newFCntx) = (translateKuifje (head ls) fBody fCntx)
-        in (hdRes, newFBody, newFCntx) <> translateKuifje (Seq (tail ls)) newFBody newFCntx
-translateKuifje (Assign id expr) fBody fCntx = 
-        let newFCntx = Map.insert id expr fCntx
-            updated = (Language.Kuifje.Syntax.update (\s ->
-              let currS = (evalE expr) s in
-              fmap (\r -> E.add s (id, r)) currS), fBody, newFCntx)
-            in updated
-translateKuifje (Sampling id (Var idexp)) fBody fCntx =
+        let base = (getFuncBody name fBody)
+            baseStmt = fst3 base
+            fInput = snd3 base
+            fOutput = trd3 base
+            baseUpdated = updateStmtUses name baseStmt
+            outCntxStmt = addOutputCntx name fOutput lOutput baseUpdated
+            inCntxStmt = addInputCntx name fInput lInput outCntxStmt
+         in translateExecKuifje inCntxStmt fBody fCntx list
+translateExecKuifje (Kuifje.Syntax.If e s1 s2) fBody fCntx list =
+        let listTrue = (fst3 (translateExecKuifje s1 fBody fCntx list))
+            listFalse = (fst3 (translateExecKuifje s2 fBody fCntx list))
+            (newRes, newFBody, newFCntx) = ((C e listTrue listFalse), fBody, fCntx)
+            monadList = concatMonadValues list newRes
+         in (monadList, newFBody, newFCntx)
+translateExecKuifje (Kuifje.Syntax.While e body) fBody fCntx list = 
+        let lBody = fst3 (translateExecKuifje body fBody fCntx list)
+         in ((W e lBody), fBody, fCntx)
+translateExecKuifje Kuifje.Syntax.Skip fBody fCntx list = ((concatMonadValues list (M skip)), fBody, fCntx)
+translateExecKuifje (Leak e) fBody fCntx list = ((concatMonadValues list (M (observe (evalE e)))), fBody, fCntx)
+translateExecKuifje (Vis s) fBody fCntx list = ((concatMonadValues list (M undefined)), fBody, fCntx)
+translateExecKuifje (Echoice s1 s2 p) fBody fCntx list = 
+        let listTrue = (fst3 (translateExecKuifje s1 fBody fCntx list))
+            listFalse = (fst3 (translateExecKuifje s2 fBody fCntx list))
+            (newRes, newFBody, newFCntx) = ((E listTrue listFalse p), fBody, fCntx)
+            monadList = concatMonadValues list newRes
+         in (monadList, newFBody, newFCntx)
+translateExecKuifje (Sampling id (Var idexp)) fBody fCntx list =
         let expr = getCntxExpr idexp fCntx
             newFCntx = Map.insert id expr fCntx
-            updated = (Language.Kuifje.Syntax.update (\s ->
-              let currS = (evalE expr) s in
-              fmap (\r -> E.add s (id, r)) currS), fBody, newFCntx)
-            in updated
-translateKuifje (Sampling id expr) fBody fCntx = 
+            monadList = concatMonadValues list (A id expr)
+         in (monadList, fBody, newFCntx)
+translateExecKuifje (Sampling id expr) fBody fCntx list =
         let newFCntx = Map.insert id expr fCntx
-            updated = (Language.Kuifje.Syntax.update (\s ->
-              let currS = (evalE expr) s in
-              fmap (\r -> E.add s (id, r)) currS), fBody, newFCntx)
-            in updated
---(Language.Kuifje.Syntax.update (\s ->
---        let currS = (evalE expr) s in
---            fmap (\r -> E.add s (id, r)) currS), fBody, fCntx)
---translateKuifje (Support id (Var idexp)) fBody fCntx =
---        let expr = getCntxExpr idexp fCntx
---            list = recoverIChoicesValues expr
---            values = DSET.fromList list
---            setExpr = (Eset values)
---            in translateKuifje (Assign id setExpr) fBody fCntx
---translateKuifje (Support id exp) fBody fCntx =
---        let list = recoverIChoicesValues exp
---            values = DSET.fromList list
---            setExpr = (Eset values)
---            in translateKuifje (Assign id setExpr) fBody fCntx
-translateKuifje (Kuifje.Syntax.While e s) fBody fCntx = 
-        (Language.Kuifje.Syntax.while (\s -> 
-                let currS = (evalE e) s in 
-                    fmap (\r -> case r of (B b) -> b) currS) (fst3 (translateKuifje s fBody fCntx)), fBody, fCntx)
-translateKuifje (Kuifje.Syntax.If e s1 s2) fBody fCntx = 
-        (Language.Kuifje.Syntax.cond 
-          (\s -> let currS = (evalE e) s in fmap (\r -> case r of (B b) -> b) currS) 
-          (fst3 (translateKuifje s1 fBody fCntx)) 
-          (fst3 (translateKuifje s2 fBody fCntx)), fBody, fCntx)
-translateKuifje Kuifje.Syntax.Skip fBody fCntx = (skip, fBody, fCntx)
-translateKuifje (Leak e) fBody fCntx = (observe (evalE e), fBody, fCntx)
-translateKuifje (Vis s) fBody fCntx = (undefined, fBody, fCntx)
-translateKuifje (Echoice s1 s2 p) fBody fCntx = 
-         (Language.Kuifje.Syntax.cond 
-          (\s -> let p' = (evalE (Ichoice (BoolConst True) (BoolConst False) p) s) 
-                  in (fmap (\r -> case r of (B b) -> b)) p') 
-          (fst3 (translateKuifje s1 fBody fCntx)) 
-          (fst3 (translateKuifje s2 fBody fCntx)), fBody, fCntx)
-translateKuifje (FuncStmt name body lInput) fBody fCntx = 
-          let (Seq ls) = body
-              lOutput = findReturns ls
-              nMap = Map.insert name (body, lInput, lOutput) fBody 
-              stmt = fst3 (translateKuifje (Kuifje.Syntax.Skip) fBody fCntx)
-          in (stmt, nMap, fCntx)
--- Returns were processed by FuncStmt, and should be skiped at this point:
-translateKuifje (ReturnStmt outputs) fBody fCntx = (skip, fBody, fCntx)
-translateKuifje (CallStmt name lInput lOutput) fBody fCntx =
-          let base = (getFuncBody name fBody)
-              baseStmt = fst3 base
-              fInput = snd3 base
-              fOutput = trd3 base
-              baseUpdated = updateStmtUses name baseStmt
-              outCntxStmt = addOutputCntx name fOutput lOutput baseUpdated
-              inCntxStmt = addInputCntx name fInput lInput outCntxStmt
-          in translateKuifje inCntxStmt fBody fCntx
+            monadList = concatMonadValues list (A id expr)
+         in (monadList, fBody, newFCntx)
 
 isReturnStmt :: Stmt -> Bool
 isReturnStmt (ReturnStmt _) = True
@@ -593,7 +591,7 @@ initGamma x y = let g = E.add E.empty ("x", (R x)) in
                E.add g ("y", (R y))
 
 hyper :: Dist (Dist Rational)
-hyper = let g = fst3 (translateKuifje exampelS Map.empty Map.empty)
+hyper = let g = createMonnad (fst3 (translateExecKuifje exampelS Map.empty Map.empty (L [])))
          in project $ hysem g (uniform [E.empty])
 
 example :: String
