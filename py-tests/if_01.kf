@@ -1,6 +1,7 @@
 p = (-1 [1/2] 2);
 prob <- p;
 
+x = 0;
 if prob > 1:
   x = 2 + 1; 
 else: 

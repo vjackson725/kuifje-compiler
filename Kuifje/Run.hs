@@ -28,12 +28,15 @@ runHyper s = do tmp <- parseFile s
                 let m = Map.empty
                 let e = Map.empty
                 let l = fst3 (translateExecKuifje tmp m e (L []))
+                --let v = runLivenessAnalysis l
                 let g = createMonnad l 
                 let kuifje = hysem g (uniform [E.empty])
                 let (env, _) = (toList $ runD kuifje) !! 0
                 let (gamma, _) = ((toList $ runD $ env) !! 0)
                 let all_var = E.allVar gamma
                 outputL [(x, Kuifje.Run.project x kuifje) | x <- all_var]
+                --if v then outputL [(x, Kuifje.Run.project x kuifje) | x <- all_var]
+                --else error ("\n\nCompilation fatal error.\n\n")
 
 outputL :: (Ord a, Boxable a) => [(String, Hyper a)] -> IO ()
 outputL ls =

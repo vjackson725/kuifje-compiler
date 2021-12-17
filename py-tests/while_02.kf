@@ -1,0 +1,6 @@
+i = 0;
+test = 32;
+while i < 2:
+  i = i + 1;
+
+leak(i);

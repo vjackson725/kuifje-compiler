@@ -1,4 +1,5 @@
 def toyfunc(a):
+  dist = 0;
   if a == 1:
     dist = 5;
   else:

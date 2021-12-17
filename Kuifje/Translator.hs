@@ -299,6 +299,7 @@ exec :: String -> Dist (Dist Gamma) -> Dist (Dist Value)
 exec var = fmap (fmap (\s -> getFromDist s var))
 
 data MonadValue = M (Kuifje Gamma)
+           | O Expr
            | A String Expr
            | L [MonadValue]
            | C Expr MonadValue MonadValue
@@ -306,12 +307,17 @@ data MonadValue = M (Kuifje Gamma)
            | W Expr MonadValue
 
 monadType :: MonadValue -> String
-monadType (A id e) = ("Assign: " ++ id)
-monadType (M md) = ("M: Monad")
-monadType (L ls) = ("L: " ++ (show (length ls)) ++ "\n")
-monadType (C e t f) = ("C: \n  T = " ++ (monadType t) ++ "\n  F = " ++ (monadType f)) 
-monadType (E t f p) = ("E: \n  T = " ++ (monadType t) ++ "\n  F = " ++ (monadType f))
-monadType (W e b) = ("W: \n  B = " ++ (monadType b))
+monadType (A id e) = ("\nAssign: " ++ id ++ " =>> " ++ (show e))
+monadType (M md) = ("\nM: Monad")
+monadType (O e) = ("\nO: Observe")
+monadType (L []) = ""
+monadType (L ls) = 
+     let hd = monadType (head ls)
+         tl = monadType (L (tail ls))
+      in ("\nL: [" ++ hd ++ tl ++ "]\n")
+monadType (C e t f) = ("\nC: \n  T = " ++ (monadType t) ++ "\n  F = " ++ (monadType f)) 
+monadType (E t f p) = ("\nE: \n  T = " ++ (monadType t) ++ "\n  F = " ++ (monadType f))
+monadType (W e b) = ("\nW: \n  B = " ++ (monadType b))
 
 concatMonadValues :: MonadValue -> MonadValue -> MonadValue
 concatMonadValues (L l1) (L l2) = (L (l1 ++ l2))
@@ -321,15 +327,17 @@ concatMonadValues v1 v2 = (L ([v1] ++ [v2]))
 
 createMonnad :: MonadValue -> Kuifje Gamma
 createMonnad (M m) = m
-createMonnad (A id e) = Language.Kuifje.Syntax.update (\s ->
-        let currS = (evalE e) s in
+createMonnad (O e) = observe (evalE e)
+createMonnad (A id expr) = 
+        Language.Kuifje.Syntax.update (\s -> 
+          let currS = (evalE expr) s in
             fmap (\r -> E.add s (id, r)) currS)
 createMonnad (L []) = skip
 createMonnad (L ls) = createMonnad (head ls) <> createMonnad (L (tail ls))
-createMonnad (W e ls) =
-        Language.Kuifje.Syntax.while (\s ->
-                let currS = (evalE e) s in
-                    fmap (\r -> case r of (B b) -> b) currS) (createMonnad ls)
+createMonnad (W e body) = 
+        Language.Kuifje.Syntax.while (\s -> 
+                let currS = (evalE e) s in 
+                    fmap (\r -> case r of (B b) -> b) currS) (createMonnad body)
 createMonnad (C e s1 s2) =
         Language.Kuifje.Syntax.cond 
           (\s -> let currS = (evalE e) s in fmap (\r -> case r of (B b) -> b) currS) 
@@ -345,6 +353,93 @@ createMonnad (E s1 s2 p) =
                   in (fmap (\r -> case r of (B b) -> b)) p')
           (createMonnad s1)
           (createMonnad s2)
+
+recoverVars :: Expr -> [String] -> [String]
+recoverVars (Var id) ls = ([id] ++ ls)
+recoverVars (RationalConst _) ls = ls
+recoverVars (Neg r) ls = recoverVars r ls
+recoverVars (ExprIf cond e1 e2) ls = 
+        let ls1 = recoverVars cond ls
+            ls2 = recoverVars e1 ls1
+            ls3 = recoverVars e2 ls2
+         in ls3
+recoverVars (ABinary _ e1 e2) ls =
+        let ls1 = recoverVars e1 ls
+            ls2 = recoverVars e2 ls1
+         in ls2
+recoverVars (Ichoice e1 e2 _) ls =
+        let ls1 = recoverVars e1 ls
+            ls2 = recoverVars e2 ls1
+         in ls2
+recoverVars (Ichoices list) ls = 
+        if length list == 1
+           then recoverVars (head list) ls
+           else (recoverVars (head list) ls) ++ (recoverVars (Ichoices (tail list)) ls)
+recoverVars (Tuple e _) ls = recoverVars e ls
+recoverVars (INUchoices list) ls =
+        if length list == 1
+           then recoverVars (head list) ls
+           else (recoverVars (head list) ls) ++ (recoverVars (Ichoices (tail list)) ls)
+recoverVars (BoolConst _) ls =  ls
+recoverVars (Not b) ls = recoverVars b ls
+recoverVars (SBinary _ e1 e2) ls =
+        let ls1 = recoverVars e1 ls
+            ls2 = recoverVars e2 ls1
+         in ls2
+recoverVars (BBinary _ e1 e2) ls =
+        let ls1 = recoverVars e1 ls
+            ls2 = recoverVars e2 ls1
+         in ls2
+recoverVars (RBinary _ e1 e2) ls =
+        let ls1 = recoverVars e1 ls
+            ls2 = recoverVars e2 ls1
+         in ls2
+recoverVars (Eset _) ls = ls
+recoverVars (SetIchoice e) ls = recoverVars e ls
+recoverVars (Geometric _ _ _ _) ls = ls
+
+checkListInMap :: Map.Map String Expr -> [String] -> Bool
+checkListInMap m [] = True
+checkListInMap m ls =
+        let hd = Map.member (head ls) m
+            tl = checkListInMap m (tail ls)
+         in if hd == False then
+            error ("\n\n  Variable (" ++ (head ls) ++ ") not declared before been used.")
+           else (hd && tl)
+
+livenessAnalysis :: MonadValue -> Map.Map String Expr -> (Bool, Map.Map String Expr)
+livenessAnalysis (M m) vars = (True, vars)
+livenessAnalysis (O e) vars = ((checkListInMap vars (recoverVars e [])),vars)
+livenessAnalysis (A id e) vars =
+        let newVars = Map.insert id e vars
+            varList = recoverVars e []
+            valid = checkListInMap vars varList
+         in (valid, newVars)
+livenessAnalysis (L []) vars = (True, vars)
+livenessAnalysis (L ls) vars =
+        let (hdVal, hdVars) = livenessAnalysis (head ls) vars
+            (tlVal, tlVars) = livenessAnalysis (L (tail ls)) hdVars
+         in ((hdVal && tlVal), tlVars)
+livenessAnalysis (C e t f) vars =
+        let eVal = (checkListInMap vars (recoverVars e []))
+            (tVal, _) = livenessAnalysis t vars
+            (fVal, _) = livenessAnalysis f vars
+         in ((eVal && tVal && fVal), vars)
+livenessAnalysis (E t f e) vars =
+        let eVal = (checkListInMap vars (recoverVars e []))
+            (tVal, tVars) = livenessAnalysis t vars
+            (fVal, fVars) = livenessAnalysis f tVars
+         in ((eVal && tVal && fVal), fVars)
+livenessAnalysis (W e b) vars =
+        let eVal = (checkListInMap vars (recoverVars e []))
+            (bVal, bVars) = livenessAnalysis b vars
+         in ((eVal && bVal), bVars)
+
+--runLivenessAnalysis :: MonadValue -> Bool
+--runLivenessAnalysis m =  
+--         if (fst (livenessAnalysis m Map.empty)) == False then
+--           error ("\n\nInvalid Program. Use of undeclared variable.\n No debug information found.\n")
+--         else True
 
 translateExecKuifje :: Stmt -> Map.Map String (Stmt, [String], [Expr]) -> Map.Map String Expr -> MonadValue -> (MonadValue, Map.Map String (Stmt, [String], [Expr]), Map.Map String Expr)
 translateExecKuifje (Seq []) fBody fCntx list = ((M skip), fBody, fCntx)
@@ -396,10 +491,12 @@ translateExecKuifje (Kuifje.Syntax.If e s1 s2) fBody fCntx list =
             monadList = concatMonadValues list newRes
          in (monadList, newFBody, newFCntx)
 translateExecKuifje (Kuifje.Syntax.While e body) fBody fCntx list = 
-        let lBody = fst3 (translateExecKuifje body fBody fCntx list)
-         in ((W e lBody), fBody, fCntx)
+        -- If a variable controls a loop, it is leaked to the adversary:
+        let (lBody, newFBody, newFCntx) = translateExecKuifje body fBody fCntx (O e)
+            monadList = concatMonadValues list (W e lBody)
+         in (monadList, newFBody, newFCntx)
 translateExecKuifje Kuifje.Syntax.Skip fBody fCntx list = ((concatMonadValues list (M skip)), fBody, fCntx)
-translateExecKuifje (Leak e) fBody fCntx list = ((concatMonadValues list (M (observe (evalE e)))), fBody, fCntx)
+translateExecKuifje (Leak e) fBody fCntx list = ((concatMonadValues list (O e)), fBody, fCntx)
 translateExecKuifje (Vis s) fBody fCntx list = ((concatMonadValues list (M undefined)), fBody, fCntx)
 translateExecKuifje (Echoice s1 s2 p) fBody fCntx list = 
         let listTrue = (fst3 (translateExecKuifje s1 fBody fCntx list))
