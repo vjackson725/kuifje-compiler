@@ -3,8 +3,8 @@ An imperative language for quantitative information flow.
 
 ## Dependences
 
-- ghc 8.10.4 or later
-- cabal 3.4.0.0 or later
+- [GHC](https://www.haskell.org/ghc/) 8.10.4 or later
+- [CABAL](https://www.haskell.org/cabal/) 3.4.0.0 or later
 
 The process was tested on ubuntu 20.04.
 
