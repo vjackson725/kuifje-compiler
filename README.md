@@ -6,7 +6,7 @@ An imperative language for quantitative information flow.
 - ghc 8.10.4 or later
 - cabal 3.4.0.0 or later
 
-The process has been tested in ubuntu 20.04.
+The process was tested on ubuntu 20.04.
 
 ## Setup
 
