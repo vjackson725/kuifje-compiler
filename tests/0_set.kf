@@ -1,4 +1,4 @@
-x := set {1, 2, 3};
-y := set {True, False};
-x := set {1, 2, 4};
-z := set {x, y};
+x = set {1, 2, 3};
+y = set {True, False};
+x = set {1, 2, 4};
+z = set {x, y};

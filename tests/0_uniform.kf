@@ -1,4 +1,4 @@
-x := uniform [1, 2, 3, 4, 5];
-y := uniform [1, 1, 2, 3, 4, 5];
-z := uniform [10, x];
-k := uniform [0..15];
+x = uniform [1, 2, 3, 4, 5];
+y = uniform [1, 1, 2, 3, 4, 5];
+z = uniform [10, x];
+k = uniform [0..15];

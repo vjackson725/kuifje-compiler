@@ -4,7 +4,7 @@ THIS=$(pwd)
 progs=$(ls *.kf)
 cd "${THIS}/../"
 for i in $progs; do
-  prog="py-tests/$i"
+  prog="tests/$i"
   echo "Running program: ${prog}"
   cat "${prog}"
   echo "=========="

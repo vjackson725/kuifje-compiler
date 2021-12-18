@@ -6,4 +6,4 @@ def f1(p):
   return y;
 
 b = f1(prob);
-leak b;
+leak(b);

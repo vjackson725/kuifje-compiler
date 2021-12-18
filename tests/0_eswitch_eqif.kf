@@ -1,9 +1,0 @@
-prob := (1 [1/2] (2 [4/5] (3 [1/2] 4)));
-if (prob == 1) then
-     x := (1 [1/2] 2);
-   else if (prob == 2) then
-     x := (2 [2/3] 3);
-   else
-     x := (3 [4/5] 4);
-   fi fi;
-leak x;

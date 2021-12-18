@@ -1,4 +1,4 @@
 // diff of leak x or not leak x
-x := 1 <0.5> 10;
-leak x;
-y := x + 1 <0.5> x;
+x = 1 <0.5> 10;
+leak(x);
+y = x + 1 <0.5> x;

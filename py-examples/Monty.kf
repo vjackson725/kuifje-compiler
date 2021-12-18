@@ -1,7 +1,0 @@
-// chosenDoor := 1;
-chosenDoor = 1 [1/3] (2 [1/2] 3);
-prizeDoor  = 1 [1/3] (2 [1/2] 3);
-remain = set {1, 2, 3} - set {chosenDoor, prizeDoor};
-tease = uniform remain;
-leak(tease);
-shouldSwitch = ~(chosenDoor == prizeDoor);

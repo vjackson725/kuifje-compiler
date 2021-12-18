@@ -1,17 +1,15 @@
-B := 6;
-E := uniform [0..15];
+B = 6;
+E = uniform [0..15];
 
-b := B;
-e := E;
-// e := 15;
-p := 1;
-while e != 0 do
-    r := e % 2;
-    if r != 0 then 
-        p := p * b;
-    else
+b = B;
+e = E;
+// e = 15;
+p = 1;
+while e != 0:
+    r = e % 2;
+    if r != 0:
+        p = p * b;
+    else:
         skip;
-    fi;
-    b := b^2;
-    e := e div 2;
-od;
+    b = b^2;
+    e = e div 2;
