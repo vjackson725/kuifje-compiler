@@ -404,7 +404,7 @@ checkListInMap m ls =
         let hd = Map.member (head ls) m
             tl = checkListInMap m (tail ls)
          in if hd == False then
-            error ("\n\n  Variable (" ++ (head ls) ++ ") not declared before been used.")
+            error ("\n\n  Variable (" ++ (head ls) ++ ") not declared before being used.")
            else (hd && tl)
 
 livenessAnalysis :: MonadValue -> Map.Map String Expr -> (Bool, Map.Map String Expr)

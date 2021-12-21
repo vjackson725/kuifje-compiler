@@ -1,0 +1,3 @@
+if false:
+  x = x + 1;
+leak(x);
