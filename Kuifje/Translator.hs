@@ -433,7 +433,7 @@ livenessAnalysis (E t f e) vars =
 livenessAnalysis (W e b) vars =
         let eVal = (checkListInMap vars (recoverVars e []))
             (bVal, bVars) = livenessAnalysis b vars
-         in ((eVal && bVal), bVars)
+         in ((eVal && bVal), vars)
 
 runLivenessAnalysis :: MonadValue -> Bool
 runLivenessAnalysis m =  
