@@ -1,0 +1,4 @@
+x = "a";
+y = "aa";
+test1 = (x == y);
+test2 = (y == x);
