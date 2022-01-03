@@ -78,7 +78,7 @@ languageDef =
                                       , "%"
                                       , "@"
                                       , "::"
-                                      , "isSubString"
+                                      , "strIsSub"
                                       , "isSub"
                                       , "in"
                                       , "nin"
@@ -375,7 +375,7 @@ eOperators =
         , [Infix  (reservedOp "<="  >> return (RBinary Le)      ) AssocLeft] 
         , [Infix  (reservedOp "=="  >> return (RBinary Eq)      ) AssocLeft] 
         , [Infix  (reservedOp "!="  >> return (RBinary Ne)      ) AssocLeft]
-        , [Infix  (reservedOp "isSubString"  >> return (RBinary IsSubstrOf)) AssocLeft]
+        , [Infix  (reservedOp "strIsSub"  >> return (RBinary IsSubstrOf) ) AssocLeft]
         , [Infix  (reservedOp "@"   >> return Tuple             ) AssocLeft]
         ]
 
