@@ -55,15 +55,8 @@ languageDef =
                                       , "uniform"
                                       , "geometric"
                                       , "|"
-                                      , "switch"
-                                      , "case"
-                                      , "default"
-                                      , "break"
                                       , "function"
-                                      , "fun"
-                                      , "nuf"
-                                      , "call"
-                                      , "returns"
+                                      , "return"
                                       ]
 
             , Token.reservedOpNames = ["+"
@@ -85,29 +78,41 @@ languageDef =
                                       , "%"
                                       , "@"
                                       , "::"
+                                      , "isSubString"
+                                      , "isSub"
+                                      , "in"
+                                      , "nin"
                                       ]
             }
 
 lexer = Token.makeTokenParser languageDef
 
-identifier = Token.identifier lexer -- parses an identifier
-reserved   = Token.reserved   lexer -- parses a reserved name
-reservedOp = Token.reservedOp lexer -- parses an operator
-parens     = Token.parens     lexer -- parses surrounding parenthesis:
-brackets   = Token.brackets   lexer -- exterior choice
-angles     = Token.angles     lexer -- interior choice
-braces     = Token.braces     lexer 
-semi       = Token.semi       lexer -- parses a semicolon
-whiteSpace = Token.whiteSpace lexer -- parses whitespace
-natural    = Token.natural    lexer
-integer    = Token.integer    lexer
-symbol     = Token.symbol     lexer
+identifier    = Token.identifier    lexer -- parses an identifier
+reserved      = Token.reserved      lexer -- parses a reserved name
+reservedOp    = Token.reservedOp    lexer -- parses an operator
+parens        = Token.parens        lexer -- parses surrounding parenthesis:
+brackets      = Token.brackets      lexer -- exterior choice
+angles        = Token.angles        lexer -- interior choice
+braces        = Token.braces        lexer 
+semi          = Token.semi          lexer -- parses a semicolon
+whiteSpace    = Token.whiteSpace    lexer -- parses whitespace
+natural       = Token.natural       lexer
+integer       = Token.integer       lexer
+symbol        = Token.symbol        lexer
+stringLiteral = Token.stringLiteral lexer
 
 --
 -- Generic
 --
 
 s << t = do { x <- s;  t; return x }
+
+stringSymbol :: Parser String
+stringSymbol = 
+  do reserved "\""
+     text <- many1 digit
+     reserved "\""
+     return text
 
 decimalRat :: Parser Rational
 decimalRat = 
@@ -370,6 +375,7 @@ eOperators =
         , [Infix  (reservedOp "<="  >> return (RBinary Le)      ) AssocLeft] 
         , [Infix  (reservedOp "=="  >> return (RBinary Eq)      ) AssocLeft] 
         , [Infix  (reservedOp "!="  >> return (RBinary Ne)      ) AssocLeft]
+        , [Infix  (reservedOp "isSubString"  >> return (RBinary IsSubstrOf)) AssocLeft]
         , [Infix  (reservedOp "@"   >> return Tuple             ) AssocLeft]
         ]
 
@@ -387,6 +393,7 @@ eTerm = (parens expression
         <|> geometricIchoices
         <|> (liftM RationalConst (try decimalRat) <?> "rat")
         <|> (liftM Var identifier <?> "var")
+        <|> (liftM Text stringLiteral <?> "text")
         <?> "eTerm") << whiteSpace
 
 elseExpr :: Parser (Expr,Expr)

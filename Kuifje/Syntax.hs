@@ -25,6 +25,8 @@ data RBinOp = Gt
             | Le
             | Eq
             | Ne
+            -- Added to support Strings
+            | IsSubstrOf
             deriving (Show, Ord, Eq)
 
 data ExprTy = EBool 
@@ -33,7 +35,8 @@ data ExprTy = EBool
 
 data Expr = Var String 
           | RationalConst Rational
-          | Neg Expr 
+          | Neg Expr
+          | Text String
           | ABinary ABinOp Expr Expr 
           | Ichoice Expr Expr Expr   -- (Expr Expr Prob)
           | Ichoices [Expr]

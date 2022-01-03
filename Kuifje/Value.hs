@@ -7,6 +7,7 @@ import Text.ParserCombinators.Parsec.Expr
 
 data Value = R Rational 
            | B Bool 
+           | T String
            | S (DSET.Set Value) 
            deriving (Show, Eq, Ord)
 

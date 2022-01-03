@@ -1,0 +1,8 @@
+x = "value";
+y = "value diff";
+z = false;
+if x == y:
+  z = true;
+else:
+  z = false;
+leak(z);

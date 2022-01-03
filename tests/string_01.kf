@@ -1,0 +1,3 @@
+x = set {"test", "works like expected"};
+y = uniform x;
+z = set y;

@@ -52,9 +52,21 @@ aOperatorWarpper op (S x) (S y) =
 aOperator op d1 d2 = 
   D $ fromListWith (+) [((aOperatorWarpper op x y), p * q) | (x, p) <- toList $ runD d1,
                                                              (y, q) <- toList $ runD d2]
+
+cOperatorWarpper Lt (R x) (R y) = (x < y)
+cOperatorWarpper Gt (R x) (R y) = (x > y)
+cOperatorWarpper Le (R x) (R y) = (x <= y)
+cOperatorWarpper Ge (R x) (R y) = (x >= y)
+cOperatorWarpper Eq (R x) (R y) = (x == y)
+cOperatorWarpper Ne (R x) (R y) = (x /= y)
+
+cOperatorWarpper IsSubstrOf (T x) (T y) = (isSubsequenceOf x y)
+cOperatorWarpper Eq (T x) (T y) = ((isInfixOf x y) && (isInfixOf y x))
+cOperatorWarpper Ne (T x) (T y) = (not ((isInfixOf x y) && (isInfixOf y x)))
+
 cOperator op d1 d2 =
-  D $ fromListWith (+) [((B (op x y)), p * q) | (R x, p) <- toList $ runD d1,
-                                                (R y, q) <- toList $ runD d2]
+  D $ fromListWith (+) [((B (cOperatorWarpper op x y)), p * q) | (x, p) <- toList $ runD d1,
+                                                                 (y, q) <- toList $ runD d2]
 bOperator op d1 d2 = 
   D $ fromListWith (+) [((B (op x y)), p * q) | (B x, p) <- toList $ runD d1,
                                                 (B y, q) <- toList $ runD d2]
@@ -79,6 +91,7 @@ evalE (Var id) = \s -> case E.lookup s id of
                           Just v -> (return v)
                           otherwise -> error ("Variable " ++ id ++ " not in scope")
 evalE (RationalConst r) = \s -> return (R r)
+evalE (Text t) = \s -> return (T t)
 evalE (Neg r) = \s -> 
         let r' = (evalE r) s in 
             (fmap (\p -> case p of 
@@ -143,13 +156,15 @@ evalE (BBinary op e1 e2) = \s ->
 evalE (RBinary op e1 e2) = \s -> 
   let e1' = (evalE e1) s
       e2' = (evalE e2) s in 
-      case op of 
-        Gt -> (cOperator (>) e1' e2')
-        Ge -> (cOperator (>=) e1' e2')
-        Lt -> (cOperator (<) e1' e2')
-        Le -> (cOperator (<=) e1' e2')
-        Eq -> (cOperator (==) e1' e2')
-        Ne -> (cOperator (/=) e1' e2')
+      cOperator op e1' e2'
+--      case op of 
+--        Gt -> (cOperator (>) e1' e2')
+--        Ge -> (cOperator (>=) e1' e2')
+--        Lt -> (cOperator (<) e1' e2')
+--        Le -> (cOperator (<=) e1' e2')
+--        Eq -> (cOperator (==) e1' e2')
+--        Ne -> (cOperator (/=) e1' e2')
+--        IsSubstrOf ->  (cOperator (<) e1' e2')
 evalE (Eset set) = \s -> 
         let exprToValue elem = toList (runD ((evalE elem) s))
             distList = Data.List.map exprToValue (DSET.toList set) 
@@ -242,6 +257,7 @@ lValuesTolExpr ls =
 
 valueToExpr :: Value -> Expr
 valueToExpr (R r) = (RationalConst r)
+valueToExpr (T t) = (Text t)
 valueToExpr (B b) = (BoolConst b)
 valueToExpr (S s) = 
         let e = DSET.elems s
@@ -357,6 +373,7 @@ createMonnad (E s1 s2 p) =
 recoverVars :: Expr -> [String] -> [String]
 recoverVars (Var id) ls = ([id] ++ ls)
 recoverVars (RationalConst _) ls = ls
+recoverVars (Text _) ls = ls
 recoverVars (Neg r) ls = recoverVars r ls
 recoverVars (ExprIf cond e1 e2) ls = 
         let ls1 = recoverVars cond ls
