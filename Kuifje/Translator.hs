@@ -71,6 +71,18 @@ bOperator op d1 d2 =
   D $ fromListWith (+) [((B (op x y)), p * q) | (B x, p) <- toList $ runD d1,
                                                 (B y, q) <- toList $ runD d2]
 
+createSetList [] = []
+createSetList ls =
+  let hd = head ls
+      tl = createSetList (tail ls)
+   in (S hd) : tl
+
+setValueWarpper (S x) = (S (DSET.fromList (createSetList (DSET.elems (DSET.powerSet x)))))
+-- DSET.powerSet x
+
+sOperatorPowerSet d1 =
+  D $ fromListWith (+) [((setValueWarpper x), p) | (x, p) <- toList $ runD d1]
+
 sBinOperatorWrapper op (S x) (S y) =
   case op of
     IsSubOf   -> DSET.isSubsetOf x y
@@ -139,6 +151,9 @@ evalE (INUchoices ls) =
           (show (evalTList $ INUchoices ls)) ++
           " --> It should be 1.0" )
 evalE (BoolConst b) = \s -> return (B b)
+evalE (PowerSet e1) = \s -> 
+       let s' = (evalE e1) s in
+           sOperatorPowerSet s'
 evalE (Not b) = \s -> 
         let r' = (evalE b) s 
          in (fmap (\bv -> case bv of 
@@ -374,6 +389,7 @@ recoverVars :: Expr -> [String] -> [String]
 recoverVars (Var id) ls = ([id] ++ ls)
 recoverVars (RationalConst _) ls = ls
 recoverVars (Text _) ls = ls
+recoverVars (PowerSet _) ls = ls
 recoverVars (Neg r) ls = recoverVars r ls
 recoverVars (ExprIf cond e1 e2) ls = 
         let ls1 = recoverVars cond ls

@@ -55,6 +55,7 @@ data Expr = Var String
           | ExprIf Expr Expr Expr
           | Eset (Set Expr)
           | Geometric Expr Expr Expr Expr
+          | PowerSet Expr
           deriving (Show, Eq, Ord)
 
 data ABinOp = Add 

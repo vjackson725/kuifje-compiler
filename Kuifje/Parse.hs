@@ -80,6 +80,7 @@ languageDef =
                                       , "::"
                                       , "strIsSub"
                                       , "isSub"
+                                      , "powerSet"
                                       , "in"
                                       , "nin"
                                       ]
@@ -355,6 +356,7 @@ expression =
 eOperators =
         [ [Prefix (reservedOp "-"   >> return Neg               )          ]
         , [Prefix (reservedOp "~"   >> return Not               )          ]
+        , [Prefix (reservedOp "powerSet"   >> return PowerSet   )          ]
         , [Infix  (reservedOp "*"   >> return (ABinary Multiply)) AssocLeft,
            Infix  (reservedOp "/"   >> return (ABinary Divide  )) AssocLeft,
            Infix  (reservedOp "div" >> return (ABinary IDivide )) AssocLeft,
