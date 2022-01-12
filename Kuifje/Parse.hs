@@ -196,7 +196,7 @@ elifCondStmt =
       
 checkIndent :: Expr -> Internal.Indentation -> Internal.Indentation -> Bool
 checkIndent expr ref pos = 
-   if expr == (RBinary Eq (RationalConst (1 % 1)) (RationalConst (1 % 1)))
+   if expr == (RBinary Ne (RationalConst (1 % 1)) (RationalConst (1 % 1)))
       then False
       else (isInBlock ref pos) 
 
@@ -206,9 +206,15 @@ getIfBlock :: Bool -> Internal.Indentation -> Parser Stmt
 getIfBlock False _ = return $ Skip
 getIfBlock True ref = do
       pos <- indentation
-      (cond, stmt) <- option ((RBinary Eq (RationalConst (1 % 1)) (RationalConst (1 % 1))),Skip) (elifCondStmt <|> elseStmt)
-      elseBlock <- (getIfBlock (checkIndent cond ref pos) ref)
-      return $ (If cond stmt elseBlock)
+      (cond, stmt) <- option ((RBinary Ne (RationalConst (1 % 1)) (RationalConst (1 % 1))),Skip) (elifCondStmt <|> elseStmt)
+      newPos <- indentation
+      if (isSamePosition pos newPos)
+         then return stmt
+         else 
+           do elseBlock <- (getIfBlock (not (isSamePosition pos newPos)) ref)
+              return (If cond stmt elseBlock)
+--      elseBlock <- (getIfBlock (not (isSamePosition pos newPos)) ref)
+--      return $ (If cond stmt elseBlock)
 
 ifStmt :: Parser Stmt
 ifStmt =
@@ -218,6 +224,7 @@ ifStmt =
       elseBlock <- (getIfBlock (isInBlock ref pos) ref)
       input <- getInput
       setInput (";" ++ input)
+      --error ("Values are:\n" ++ (show (If cond stmt elseBlock)))
       return $ (If cond stmt elseBlock)
 
 -- | Obtain the current indentation, to be used as a reference later.
@@ -232,6 +239,9 @@ indentationBlock = do
     pos <- getPosition
     return $! Internal.Indentation {Internal.iLine = sourceLine pos, Internal.iColumn = ((sourceColumn pos) +  1)}
 
+-- | Verifies if the position is in the same position
+isSamePosition :: Internal.Indentation -> Internal.Indentation -> Bool
+isSamePosition ref pos = ((Internal.iColumn pos == Internal.iColumn ref) && (Internal.iLine pos == Internal.iLine ref))
 
 -- | Verifies if the position is in the same block as the reference position
 isInBlock :: Internal.Indentation -> Internal.Indentation -> Bool

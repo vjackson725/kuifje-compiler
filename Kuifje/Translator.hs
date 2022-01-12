@@ -345,7 +345,7 @@ monadType (L []) = ""
 monadType (L ls) = 
      let hd = monadType (head ls)
          tl = monadType (L (tail ls))
-      in ("\nL: [" ++ hd ++ tl ++ "]\n")
+      in ("\n[" ++ hd ++ tl ++ "]")
 monadType (C e t f) = ("\nC: \n  T = " ++ (monadType t) ++ "\n  F = " ++ (monadType f)) 
 monadType (E t f p) = ("\nE: \n  T = " ++ (monadType t) ++ "\n  F = " ++ (monadType f))
 monadType (W e b) = ("\nW: \n  B = " ++ (monadType b))
@@ -479,7 +479,7 @@ translateExecKuifje (Seq []) fBody fCntx list = ((M skip), fBody, fCntx)
 translateExecKuifje (Seq ls) fBody fCntx list = 
         let (hdRes, hdFBody, hdFCntx) = (translateExecKuifje (head ls) fBody fCntx list)
             (tlRes, tlFBody, tlFCntx) = (translateExecKuifje (Seq (tail ls)) hdFBody hdFCntx hdRes)
-            monadList = concatMonadValues hdRes tlRes 
+            monadList = concatMonadValues hdRes tlRes
          in (monadList, tlFBody, tlFCntx)
 translateExecKuifje (Assign id expr) fBody fCntx list = 
         let newFCntx = Map.insert id expr fCntx
@@ -518,8 +518,8 @@ translateExecKuifje (CallStmt name lInput lOutput) fBody fCntx list =
             inCntxStmt = addInputCntx name fInput lInput outCntxStmt
          in translateExecKuifje inCntxStmt fBody fCntx list
 translateExecKuifje (Kuifje.Syntax.If e s1 s2) fBody fCntx list =
-        let listTrue = (fst3 (translateExecKuifje s1 fBody fCntx list))
-            listFalse = (fst3 (translateExecKuifje s2 fBody fCntx list))
+        let listTrue = (fst3 (translateExecKuifje s1 fBody fCntx (L [])))
+            listFalse = (fst3 (translateExecKuifje s2 fBody fCntx (L [])))
             (newRes, newFBody, newFCntx) = ((C e listTrue listFalse), fBody, fCntx)
             monadList = concatMonadValues list newRes
          in (monadList, newFBody, newFCntx)
@@ -532,8 +532,8 @@ translateExecKuifje Kuifje.Syntax.Skip fBody fCntx list = ((concatMonadValues li
 translateExecKuifje (Leak e) fBody fCntx list = ((concatMonadValues list (O e)), fBody, fCntx)
 translateExecKuifje (Vis s) fBody fCntx list = ((concatMonadValues list (M undefined)), fBody, fCntx)
 translateExecKuifje (Echoice s1 s2 p) fBody fCntx list = 
-        let listTrue = (fst3 (translateExecKuifje s1 fBody fCntx list))
-            listFalse = (fst3 (translateExecKuifje s2 fBody fCntx list))
+        let listTrue = (fst3 (translateExecKuifje s1 fBody fCntx (L [])))
+            listFalse = (fst3 (translateExecKuifje s2 fBody fCntx (L [])))
             (newRes, newFBody, newFCntx) = ((E listTrue listFalse p), fBody, fCntx)
             monadList = concatMonadValues list newRes
          in (monadList, newFBody, newFCntx)
