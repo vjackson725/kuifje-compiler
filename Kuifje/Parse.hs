@@ -213,8 +213,6 @@ getIfBlock True ref = do
          else 
            do elseBlock <- (getIfBlock (not (isSamePosition pos newPos)) ref)
               return (If cond stmt elseBlock)
---      elseBlock <- (getIfBlock (not (isSamePosition pos newPos)) ref)
---      return $ (If cond stmt elseBlock)
 
 ifStmt :: Parser Stmt
 ifStmt =
@@ -224,7 +222,6 @@ ifStmt =
       elseBlock <- (getIfBlock (isInBlock ref pos) ref)
       input <- getInput
       setInput (";" ++ input)
-      --error ("Values are:\n" ++ (show (If cond stmt elseBlock)))
       return $ (If cond stmt elseBlock)
 
 -- | Obtain the current indentation, to be used as a reference later.
