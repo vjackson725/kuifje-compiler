@@ -29,6 +29,7 @@ project var = fmap (fmap (\s -> getFrom s var))
 
 processFlag :: String -> String -> [(String, (Dist (Dist Value)))] -> IO ()
 processFlag "json1" fName values = createJson1 fName values
+processFlag "json2" fName values = createJson2 fName values
 processFlag f _ _ = error ("\n\n  Unknown flag:\n" ++ f ++ "\n")
 
 readFlags :: [String] -> String -> [(String, (Dist (Dist Value)))] -> IO ()
