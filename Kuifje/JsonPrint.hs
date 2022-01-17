@@ -206,8 +206,8 @@ createDistHyper2 mp = let probList = M.elems mp
 createHyperField2 :: Integer -> (M.Map (M.Map String Prob) Prob) -> String
 createHyperField2 s mp = let hyperProbs = createDistHyper2 mp
                              worlds = createListField2 (M.keys mp)
-                             s1 = (spaceGen s) ++ "\"hyper\": [" ++ hyperProbs
-                          in s1 ++ ", [" ++ worlds ++ "] ]"
+                             s1 = (spaceGen s) ++ "\"hyper\": [ " ++ hyperProbs
+                          in s1 ++ ", [ " ++ worlds ++ " ] ]"
                             
 variableDomain2 :: Integer -> Dist (Dist Value) -> String
 variableDomain2 s hyper = let (D d1) = hyper
