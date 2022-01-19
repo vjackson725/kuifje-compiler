@@ -365,7 +365,7 @@ createMonnad (A id expr) =
             fmap (\r -> E.add s (id, r)) currS)
 createMonnad (L []) = skip
 createMonnad (L ls) = createMonnad (head ls) <> createMonnad (L (tail ls))
-createMonnad (W e body) = 
+createMonnad (W e body) =
         Language.Kuifje.Syntax.while (\s -> 
                 let currS = (evalE e) s in 
                     fmap (\r -> case r of (B b) -> b) currS) (createMonnad body)
@@ -477,7 +477,8 @@ runLivenessAnalysis m =
 translateExecKuifje :: Stmt -> Map.Map String (Stmt, [String], [Expr]) -> Map.Map String Expr -> MonadValue -> (MonadValue, Map.Map String (Stmt, [String], [Expr]), Map.Map String Expr)
 translateExecKuifje (Seq []) fBody fCntx list = ((M skip), fBody, fCntx)
 translateExecKuifje (Seq ls) fBody fCntx list = 
-        let (hdRes, hdFBody, hdFCntx) = (translateExecKuifje (head ls) fBody fCntx list)
+        -- let (hdRes, hdFBody, hdFCntx) = (translateExecKuifje (head ls) fBody fCntx list)
+        let (hdRes, hdFBody, hdFCntx) = (translateExecKuifje (head ls) fBody fCntx (L []))
             (tlRes, tlFBody, tlFCntx) = (translateExecKuifje (Seq (tail ls)) hdFBody hdFCntx hdRes)
             monadList = concatMonadValues hdRes tlRes
          in (monadList, tlFBody, tlFCntx)
@@ -523,7 +524,7 @@ translateExecKuifje (Kuifje.Syntax.If e s1 s2) fBody fCntx list =
             (newRes, newFBody, newFCntx) = ((C e listTrue listFalse), fBody, fCntx)
             monadList = concatMonadValues list newRes
          in (monadList, newFBody, newFCntx)
-translateExecKuifje (Kuifje.Syntax.While e body) fBody fCntx list = 
+translateExecKuifje (Kuifje.Syntax.While e body) fBody fCntx list =
         -- If a variable controls a loop, it is leaked to the adversary:
         let (lBody, newFBody, newFCntx) = translateExecKuifje body fBody fCntx (O e)
             monadList = concatMonadValues list (W e lBody)
