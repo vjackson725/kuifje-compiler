@@ -6,6 +6,7 @@ import Kuifje.Value
 import Kuifje.Syntax
 import Kuifje.PrettyPrint 
 import Kuifje.JsonPrint
+--import Kuifje.CsvLoader
 import qualified Kuifje.Env as E
 
 import System.Environment
@@ -40,6 +41,7 @@ readFlags ls fName variables = do processFlag (head ls) fName variables
 runHyper s ls = do tmp <- parseFile s
                    let m = Map.empty
                    let e = Map.empty
+                   --st <- readCSVs s tmp
                    let l = fst3 (translateExecKuifje tmp m e (L []))
                    let v = runLivenessAnalysis l
                    let g = createMonnad l 

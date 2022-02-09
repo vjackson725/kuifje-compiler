@@ -18,6 +18,7 @@ instance Boxable (Value) where
   toBox (T x) = text "T" <+> text (show $ x)
   toBox (B x) = text "B" <+> text (show x)
   toBox (S x) = text "S" <+> (toBox $ S.elems x)
+  toBox (PD x) = text "PD" <+> (toBox $ S.elems x)
 
 instance Boxable (Env Value) where
   toBox (Env m) = toBox $ M.elems m

@@ -64,6 +64,8 @@ cOperatorWarpper IsSubstrOf (T x) (T y) = (isSubsequenceOf x y)
 cOperatorWarpper Eq (T x) (T y) = ((isInfixOf x y) && (isInfixOf y x))
 cOperatorWarpper Ne (T x) (T y) = (not ((isInfixOf x y) && (isInfixOf y x)))
 
+cOperatorWarpper op v1 v2 = error ("Operator: " ++ (show op) ++ " Not found!\n" ++ (show v1) ++ "\n" ++ (show v2))
+
 cOperator op d1 d2 =
   D $ fromListWith (+) [((B (cOperatorWarpper op x y)), p * q) | (x, p) <- toList $ runD d1,
                                                                  (y, q) <- toList $ runD d2]
@@ -98,6 +100,166 @@ sBinOperator op d1 d2 =
   D $ fromListWith (+) [((B (sBinOperatorWrapper op x y)), p * q) | (x, p) <- toList $ runD d1,
                                                                     (y, q) <- toList $ runD d2]
 
+
+updateProbs :: [(Prob, Value)] -> Prob -> [(Prob, Value)]
+updateProbs [] _ = []
+updateProbs ls p = let hd = head ls
+                       tl = tail ls
+                       pEl = fst hd
+                       el = snd hd
+                       newP = pEl * p
+                       newEl = (newP, el)
+                       newList = updateProbs tl p
+                    in newEl : newList
+
+createNewDist :: Value -> Value -> Prob -> Value
+createNewDist (PD s1) (PD s2) p = 
+   let el1 = DSET.elems s1
+       el2 = DSET.elems s2
+       newEl1 = updateProbs el1 p
+       newEl2 = updateProbs el2 (1-p)
+       newList = newEl1 ++ newEl2
+    in (PD (DSET.fromDistinctAscList newList))
+createNewDist (PD s1) v2 p =
+   let el1 = DSET.elems s1
+       newEl1 = updateProbs el1 p
+       newEl2 = [((1-p), v2)]
+       newList = newEl1 ++ newEl2
+    in (PD (DSET.fromDistinctAscList newList))
+createNewDist v1 (PD s2) p =
+   let el2 = DSET.elems s2
+       newEl2 = updateProbs el2 (1-p)
+       newEl1 = [(p, v1)]
+       newList = newEl1 ++ newEl2
+    in (PD (DSET.fromDistinctAscList newList))
+createNewDist v1 v2 p = 
+   let newEl1 = [(p, v1)]
+       newEl2 = [((1-p), v2)]
+       newList = newEl1 ++ newEl2
+    in (PD (DSET.fromDistinctAscList newList))
+
+exprToValue :: Expr -> Value
+exprToValue (RationalConst r) = (R r)
+exprToValue (Text t) = (T t)
+exprToValue (Neg a) = exprToValue (ABinary Multiply (RationalConst (-1 % 1)) a)
+exprToValue (BoolConst b) = (B b)
+exprToValue (ABinary Multiply (RationalConst a) (RationalConst b)) = (R (a * b))
+exprToValue (ABinary Divide (RationalConst a) (RationalConst b)) = (R (a / b))
+exprToValue (Eset ns) = 
+   let e = DSET.elems ns
+       l = lExprTolValues e
+       s = DSET.fromList l
+    in (S s)
+exprToValue (IchoiceDist e1 e2 p) =
+   let v1 = exprToValue e1
+       v2 = exprToValue e2
+       (R r) = exprToValue p
+       p2 = (1 - r)
+       list = [(r, v1), (p2, v2)]
+    in (PD (DSET.fromDistinctAscList list))
+exprToValue e = error ("Invalid exprToValue:\n" ++ (show e))
+
+lExprTolValues :: [Expr] -> [Value]
+lExprTolValues [] = []
+lExprTolValues ls =
+        let hd = exprToValue (head ls)
+            tl = lExprTolValues (tail ls)
+         in hd : tl
+
+createDistList :: Prob -> [Expr] -> [(Prob, Value)]
+createDistList _ [] = []
+createDistList prob ls = let hd = exprToValue (head ls)
+                             tl = createDistList prob (tail ls)
+                          in [(prob, hd)] ++ tl
+
+convertTuple :: Expr -> (Prob, Value)
+convertTuple (Tuple e p) = let val = exprToValue e
+                               (R pr) = exprToValue p
+                            in (pr, val)
+
+convertINUlist :: [Expr] -> [(Prob, Value)]
+convertINUlist [] = []
+convertINUlist ls = let hd = convertTuple (head ls)
+                        tl = convertINUlist (tail ls)
+                     in hd : tl
+
+convertDistListToExprList :: [(Prob, Value)] -> [Expr]
+convertDistListToExprList [] = []
+convertDistListToExprList ls = let (p, v) = head ls
+                                   newE = valueToExpr v
+                                   newP = valueToExpr (R p)
+                                   tl = convertDistListToExprList (tail ls)
+                                   tuple = (Tuple newE newP)
+                                in tuple : tl
+
+convertTupleListToExpr :: [Expr] -> Expr
+convertTupleListToExpr ls = if (length ls) == 1
+                            then (head ls)
+                            else let (Tuple eHead p) = (head ls)
+                                     eTail = convertTupleListToExpr (tail ls)
+                                  in (Ichoice eHead eTail p)
+
+convertDistToExpr :: Value -> Expr
+convertDistToExpr (PD s) = let expL = convertDistListToExprList (DSET.elems s)
+                            in convertTupleListToExpr expL
+
+sampleFromDistList :: [Expr] -> [Expr]
+sampleFromDistList [] = []
+sampleFromDistList ls = let hd = sampleFromDist (head ls)
+                            tl = sampleFromDistList (tail ls)
+                         in hd : tl
+
+sampleFromDist :: Expr -> Expr
+-- Primitive Values
+sampleFromDist (Var id) = (Var id)
+sampleFromDist (RationalConst r) = (RationalConst r) 
+sampleFromDist (Text t) = (Text t)
+sampleFromDist (Neg r) = (Neg r)
+sampleFromDist (BoolConst b) = (BoolConst b)
+sampleFromDist (Not b) = (Not b)
+sampleFromDist (Geometric alpha low start high) = (Geometric alpha low start high)
+-- Complex Values (including set)
+sampleFromDist (Eset set) = let newL = sampleFromDistList (DSET.elems set)
+                                newSet = DSET.fromList newL
+                             in (Eset newSet)
+sampleFromDist (ExprIf cond e1 e2) = let newE1 = sampleFromDist e1
+                                         newE2 = sampleFromDist e2
+                                      in (ExprIf cond newE1 newE2) 
+sampleFromDist (ABinary op e1 e2) = let newE1 = sampleFromDist e1
+                                        newE2 = sampleFromDist e2
+                                     in (ABinary op e1 e2)
+sampleFromDist (Ichoice e1 e2 p) = let newE1 = sampleFromDist e1
+                                       newE2 = sampleFromDist e2
+                                    in (Ichoice newE1 newE2 p)
+sampleFromDist (IchoiceDist e1 e2 p) = let newE1 = sampleFromDist e1
+                                           newE2 = sampleFromDist e2
+                                        in (Ichoice newE1 newE2 p)
+sampleFromDist (Ichoices ls) = let newLs = sampleFromDistList ls
+                                in (Ichoices newLs)
+sampleFromDist (IchoicesDist ls) = let newLs = sampleFromDistList ls
+                                    in (Ichoices newLs)
+sampleFromDist (Tuple e p) = let newE = sampleFromDist e
+                              in (Tuple newE p)
+sampleFromDist (INUchoices ls) = let newLs = sampleFromDistList ls
+                                  in (INUchoices newLs)
+sampleFromDist (INUchoicesDist ls) = let newLs = sampleFromDistList ls
+                                      in (INUchoices newLs)
+sampleFromDist (PowerSet e) = let newE = sampleFromDist e
+                               in (PowerSet newE)
+sampleFromDist (SBinary op e1 e2) = let newE1 = sampleFromDist e1
+                                        newE2 = sampleFromDist e2
+                                     in (SBinary op newE1 newE2)
+sampleFromDist (BBinary op e1 e2) = let newE1 = sampleFromDist e1
+                                        newE2 = sampleFromDist e2
+                                     in (BBinary op newE1 newE2)
+sampleFromDist (RBinary op e1 e2) = let newE1 = sampleFromDist e1
+                                        newE2 = sampleFromDist e2
+                                     in (RBinary op newE1 newE2)
+sampleFromDist (SetIchoice e) = let newE = sampleFromDist e
+                                 in (SetIchoice newE)
+sampleFromDist (SetIchoiceDist e) = let newE = sampleFromDist e
+                                     in (SetIchoice newE)
+
 evalE :: Expr -> (Gamma ~> Value)
 evalE (Var id) = \s -> case E.lookup s id of 
                           Just v -> (return v)
@@ -131,6 +293,12 @@ evalE (Ichoice e1 e2 p) = \s ->
       d1 = D $ Data.Map.Strict.map (*p') $ runD e1'
       d2 = D $ Data.Map.Strict.map (*(1-p')) $ runD e2'
    in D $ unionWith (+) (runD d1) (runD d2)
+evalE (IchoiceDist e1 e2 p) = \s -> 
+  let v1 = exprToValue e1
+      v2 = exprToValue e2
+      (R r) = exprToValue p
+      dist = createNewDist v1 v2 r
+   in return dist
 evalE (Ichoices ls) = 
    if length ls == 1 
       then evalE $ head ls
@@ -138,6 +306,11 @@ evalE (Ichoices ls) =
                           (head ls) 
                           (Ichoices (tail ls)) 
                           (RationalConst (1 % (toInteger (length ls))))
+evalE (IchoicesDist ls) = \s -> 
+   let p = (1 % (toInteger (length ls)))
+       vals = createDistList p ls
+       dist = (PD (DSET.fromDistinctAscList vals))
+    in return dist
 evalE (Tuple e p) = \s ->
   let e' = (evalE e) s
       p' = Data.List.foldr (\x y -> case x of (R x', q) -> x'*q*y) 1
@@ -149,6 +322,14 @@ evalE (INUchoices ls) =
      then evalNUList $ INUchoices ls
      else error ("Probability adds up to: " ++ 
           (show (evalTList $ INUchoices ls)) ++
+          " --> It should be 1.0" )
+evalE (INUchoicesDist ls) = \s ->
+  if (evalTList $ INUchoicesDist ls) == 1.0
+     then let vals = convertINUlist ls
+              dist = (PD (DSET.fromDistinctAscList vals))
+           in return dist
+     else error ("Probability adds up to: " ++ 
+          (show (evalTList $ INUchoicesDist ls)) ++
           " --> It should be 1.0" )
 evalE (BoolConst b) = \s -> return (B b)
 evalE (PowerSet e1) = \s -> 
@@ -198,6 +379,13 @@ evalE (SetIchoice e) = \s ->
                                         | elem <- DSET.toList set] 
                                         | (S set, p) <- toList (runD d)]
          in D $ fromListWith (+) resultList
+evalE (SetIchoiceDist e) = \s -> 
+        let d = (evalE e) s
+            resultList = concat [[(p/(toInteger (DSET.size set) % 1), elem)
+                                        | elem <- DSET.toList set]
+                                        | (S set, p) <- toList (runD d)]
+            dist = (PD (DSET.fromDistinctAscList resultList))
+         in return dist
 evalE (Geometric alpha low start high) =
          let alphaV = evalTList $ alpha
              lowV = round (evalTList $ low)
@@ -211,6 +399,9 @@ evalE (Geometric alpha low start high) =
              sProbs = sum probs
              resultDist = buildDist values probs
          in evalNUList $ INUchoices resultDist
+
+extractStr :: Expr -> String
+extractStr (Text t) = t
 
 buildDist :: [Integer] -> [Rational] -> [Expr]
 buildDist [] [] = []
@@ -238,6 +429,11 @@ evalTList (INUchoices []) = 0.0
 evalTList (INUchoices ls) = 
   let hd = (evalTList $ head ls)
       tl = (evalTList $ INUchoices (tail ls))
+  in hd + tl
+evalTList (INUchoicesDist []) = 0.0
+evalTList (INUchoicesDist ls) =
+  let hd = (evalTList $ head ls)
+      tl = (evalTList $ INUchoicesDist (tail ls))
   in hd + tl
 
 recoverIChoicesValues :: Expr -> [Expr]
@@ -279,6 +475,10 @@ valueToExpr (S s) =
             l = lValuesTolExpr e
             ns = DSET.fromList l
          in (Eset ns)
+valueToExpr (PD s) = 
+        let ls = DSET.elems s
+            e = convertDistListToExprList ls
+         in (INUchoicesDist e) 
 
 valuesToExprList :: [(Value, Rational)] -> [Expr]
 valuesToExprList [] = []
@@ -345,14 +545,14 @@ monadType (L []) = ""
 monadType (L ls) = 
      let hd = monadType (head ls)
          tl = monadType (L (tail ls))
-      in ("\n[" ++ hd ++ tl ++ "]")
+      in ("\n[" ++ hd ++ " <> "++ tl ++ "]")
 monadType (C e t f) = ("\nC: \n  T = " ++ (monadType t) ++ "\n  F = " ++ (monadType f)) 
 monadType (E t f p) = ("\nE: \n  T = " ++ (monadType t) ++ "\n  F = " ++ (monadType f))
 monadType (W e b) = ("\nW: \n  B = " ++ (monadType b))
 
 concatMonadValues :: MonadValue -> MonadValue -> MonadValue
 concatMonadValues (L l1) (L l2) = (L (l1 ++ l2))
-concatMonadValues v (L l2) = (L ([v] ++ l2))
+concatMonadValues v (L l2) = (L (v : l2))
 concatMonadValues (L l1) v = (L (l1 ++ [v]))
 concatMonadValues v1 v2 = (L ([v1] ++ [v2]))
 
@@ -389,6 +589,14 @@ recoverVars :: Expr -> [String] -> [String]
 recoverVars (Var id) ls = ([id] ++ ls)
 recoverVars (RationalConst _) ls = ls
 recoverVars (Text _) ls = ls
+recoverVars (IchoicesDist list) ls = 
+        if length list == 1
+           then recoverVars (head list) ls
+           else (recoverVars (head list) ls) ++ (recoverVars (Ichoices (tail list)) ls)
+recoverVars (IchoiceDist e1 e2 _) ls = 
+        let ls1 = recoverVars e1 ls
+            ls2 = recoverVars e2 ls1
+         in ls2
 recoverVars (PowerSet _) ls = ls
 recoverVars (Neg r) ls = recoverVars r ls
 recoverVars (ExprIf cond e1 e2) ls = 
@@ -413,6 +621,10 @@ recoverVars (INUchoices list) ls =
         if length list == 1
            then recoverVars (head list) ls
            else (recoverVars (head list) ls) ++ (recoverVars (Ichoices (tail list)) ls)
+recoverVars (INUchoicesDist list) ls =
+        if length list == 1
+           then recoverVars (head list) ls
+           else (recoverVars (head list) ls) ++ (recoverVars (Ichoices (tail list)) ls)
 recoverVars (BoolConst _) ls =  ls
 recoverVars (Not b) ls = recoverVars b ls
 recoverVars (SBinary _ e1 e2) ls =
@@ -429,6 +641,7 @@ recoverVars (RBinary _ e1 e2) ls =
          in ls2
 recoverVars (Eset _) ls = ls
 recoverVars (SetIchoice e) ls = recoverVars e ls
+recoverVars (SetIchoiceDist e) ls = recoverVars e ls
 recoverVars (Geometric _ _ _ _) ls = ls
 
 checkListInMap :: Map.Map String Expr -> [String] -> Bool
@@ -475,19 +688,22 @@ runLivenessAnalysis m =
          else True
 
 translateExecKuifje :: Stmt -> Map.Map String (Stmt, [String], [Expr]) -> Map.Map String Expr -> MonadValue -> (MonadValue, Map.Map String (Stmt, [String], [Expr]), Map.Map String Expr)
-translateExecKuifje (Seq []) fBody fCntx list = ((M skip), fBody, fCntx)
+translateExecKuifje (Seq []) fBody fCntx list = (list, fBody, fCntx)
 translateExecKuifje (Seq ls) fBody fCntx list = 
-        -- let (hdRes, hdFBody, hdFCntx) = (translateExecKuifje (head ls) fBody fCntx list)
-        let (hdRes, hdFBody, hdFCntx) = (translateExecKuifje (head ls) fBody fCntx (L []))
+        let (hdRes, hdFBody, hdFCntx) = (translateExecKuifje (head ls) fBody fCntx list)
+        --let (hdRes, hdFBody, hdFCntx) = (translateExecKuifje (head ls) fBody fCntx (L []))
             (tlRes, tlFBody, tlFCntx) = (translateExecKuifje (Seq (tail ls)) hdFBody hdFCntx hdRes)
-            monadList = concatMonadValues hdRes tlRes
-         in (monadList, tlFBody, tlFCntx)
+        --    (tlRes, tlFBody, tlFCntx) = (translateExecKuifje (Seq (tail ls)) hdFBody hdFCntx (L []))
+        --    monadList = concatMonadValues hdRes tlRes
+        -- in (monadList, tlFBody, tlFCntx)
+        -- in (tlRes, tlFBody, tlFCntx)
+         in (translateExecKuifje (Seq (tail ls)) hdFBody hdFCntx hdRes)
 translateExecKuifje (Assign id expr) fBody fCntx list = 
         let newFCntx = Map.insert id expr fCntx
             monadList = concatMonadValues list (A id expr)
          in (monadList, fBody, newFCntx)
          --in (monadList, newFBody, newFCntxA)
-translateExecKuifje (Support id (Var idexp)) fBody fCntx list =
+translateExecKuifje (Support id (Var idexp)) fBody fCntx list = 
         let gammaL = createMonnad list
             kuifje = hysem gammaL (uniform [E.empty])
             executed = exec idexp kuifje
@@ -517,6 +733,7 @@ translateExecKuifje (CallStmt name lInput lOutput) fBody fCntx list =
             baseUpdated = updateStmtUses name baseStmt
             outCntxStmt = addOutputCntx name fOutput lOutput baseUpdated
             inCntxStmt = addInputCntx name fInput lInput outCntxStmt
+         --in error ("Call is:\n" ++ (show inCntxStmt))
          in translateExecKuifje inCntxStmt fBody fCntx list
 translateExecKuifje (Kuifje.Syntax.If e s1 s2) fBody fCntx list =
         let listTrue = (fst3 (translateExecKuifje s1 fBody fCntx (L [])))
@@ -539,12 +756,14 @@ translateExecKuifje (Echoice s1 s2 p) fBody fCntx list =
             monadList = concatMonadValues list newRes
          in (monadList, newFBody, newFCntx)
 translateExecKuifje (Sampling id (Var idexp)) fBody fCntx list =
-        let expr = getCntxExpr idexp fCntx
+        let exprD = getCntxExpr idexp fCntx
+            expr = sampleFromDist exprD
             newFCntx = Map.insert id expr fCntx
             monadList = concatMonadValues list (A id expr)
          in (monadList, fBody, newFCntx)
-translateExecKuifje (Sampling id expr) fBody fCntx list =
-        let newFCntx = Map.insert id expr fCntx
+translateExecKuifje (Sampling id exprD) fBody fCntx list =
+        let expr = sampleFromDist exprD
+            newFCntx = Map.insert id expr fCntx
             monadList = concatMonadValues list (A id expr)
          in (monadList, fBody, newFCntx)
 
@@ -631,6 +850,17 @@ updateExpression fName (Ichoices ls) =
          tl = (updateExpression fName (Ichoices (tail ls)))
          (Ichoices list) = tl
      in (Ichoices (hd : list))
+updateExpression fName (IchoiceDist e1 e2 p) =
+     let newp = (updateExpression fName p)
+         newe1 = (updateExpression fName e1)
+         newe2 = (updateExpression fName e2)
+     in (IchoiceDist newe1 newe2 newp)
+updateExpression fName (IchoicesDist []) = (Ichoices [])
+updateExpression fName (IchoicesDist ls) =
+     let hd = (updateExpression fName (head ls))
+         tl = (updateExpression fName (Ichoices (tail ls)))
+         (IchoicesDist list) = tl
+     in (IchoicesDist (hd : list))
 updateExpression fName (Tuple e p) =
      let newe = (updateExpression fName e)
      in (Tuple newe p)

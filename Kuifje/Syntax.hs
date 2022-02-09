@@ -39,10 +39,14 @@ data Expr = Var String
           | Text String
           | ABinary ABinOp Expr Expr 
           | Ichoice Expr Expr Expr   -- (Expr Expr Prob)
+          | IchoiceDist Expr Expr Expr   -- (Expr Expr Prob)
           | Ichoices [Expr]
+          | IchoicesDist [Expr]
           | Tuple Expr Expr
           | INUchoices [Expr]
+          | INUchoicesDist [Expr]
           | SetIchoice Expr
+          | SetIchoiceDist Expr
 
           -- Bool Expr
           | BoolConst Bool
@@ -77,6 +81,7 @@ data Stmt = Seq [Stmt]
           | ReturnStmt [Expr]
           | CallStmt String [Expr] [String]
           | Support String Expr
+          | Csv String Expr Expr
           | Skip 
           | Leak Expr
           | Vis String

@@ -1,4 +1,5 @@
-prob = (1 [1/3] 2);
+probD = (1 [1/3] 2);
+prob <- probD;
 
 def f1(a):
   b = a;

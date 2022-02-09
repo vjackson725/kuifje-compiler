@@ -57,6 +57,7 @@ languageDef =
                                       , "|"
                                       , "function"
                                       , "return"
+                                      , "csv"
                                       ]
 
             , Token.reservedOpNames = ["+"
@@ -156,6 +157,7 @@ sTerm = (braces statements
          <|> try callStmt
          <|> try samplingStmt
          <|> try supportStmt
+         <|> try readStmt
          <|> assignStmt
          <|> ifStmt
          <|> whileStmt
@@ -351,6 +353,18 @@ leakStmt =
      reservedOp ")"
      return $ Leak expr
 
+readStmt :: Parser Stmt
+readStmt =
+  do var <- identifier
+     reservedOp "="
+     reserved "csv"
+     reservedOp "("
+     file <- expression
+     reservedOp ","
+     columns <- expression
+     reservedOp ")"
+     return $ Csv var file columns
+
 --
 -- Expressions
 --
@@ -377,7 +391,7 @@ eOperators =
            Infix  (reservedOp "isSub"  >> return (SBinary IsSubOf)) AssocLeft]
         , [Infix  (reservedOp "&&"  >> return (BBinary And     )) AssocLeft,
            Infix  (reservedOp "||"  >> return (BBinary Or      )) AssocLeft]
-        , [Infix  (kChoice Ichoice)                               AssocLeft]
+        , [Infix  (kChoice IchoiceDist)                               AssocLeft]
         , [Infix  (reservedOp ">"   >> return (RBinary Gt)      ) AssocLeft] 
         , [Infix  (reservedOp "<"   >> return (RBinary Lt)      ) AssocLeft] 
         , [Infix  (reservedOp ">="  >> return (RBinary Ge)      ) AssocLeft] 
@@ -388,11 +402,12 @@ eOperators =
         , [Infix  (reservedOp "@"   >> return Tuple             ) AssocLeft]
         ]
 
-eTerm :: Parser Expr
-eTerm = (parens expression
+eTermR :: Parser Expr
+eTermR = (parens expression
         <|> (reserved "true"  >> return (BoolConst True ) <?> "true")
         <|> (reserved "false" >> return (BoolConst False) <?> "false")
-        <|> ifExpr
+        <|> (reserved "True"  >> return (BoolConst True ) <?> "true")
+        <|> (reserved "False" >> return (BoolConst False) <?> "false")
         <|> setExpr
         <|> try uniformFromSet
         <|> try uniformIchoices
@@ -405,51 +420,18 @@ eTerm = (parens expression
         <|> (liftM Text stringLiteral <?> "text")
         <?> "eTerm") << whiteSpace
 
-elseExpr :: Parser (Expr,Expr)
-elseExpr =
-   do reserved "else"
-      reservedOp ":"
-      body <- expression
-      -- For else statements, the condition should be always true
-      return $ ((RBinary Eq (RationalConst (1 % 1)) (RationalConst (1 % 1))) , body)
+eTermL :: Parser Expr
+eTermL = ifExpr
 
-ifCondExpr :: Parser (Expr,Expr)
-ifCondExpr =
-   do reserved "if"
-      cond <- expression
-      reservedOp ":"
-      body <- expression
-      input <- getInput
-      return $ (cond, body)
-
-elifCondExpr :: Parser (Expr,Expr)
-elifCondExpr =
-   do reserved "elif"
-      cond <- expression
-      reservedOp ":"
-      body <- expression
-      input <- getInput
-      return $ (cond, body)
-
--- | Parses a block of lines at the same indentation level starting at the
--- current position
-getIfBlockExpr :: Parser Expr
-getIfBlockExpr = do
-      -- Option provides a default value, that is an indetermination.
-      -- If the values at this point add up to one, it will be naturally skiped.
-      -- Otherwise the default value will generate an error, as the Expression does not add up to one.
-      (cond, exprIf) <- option ((RBinary Ne (RationalConst (1 % 1)) (RationalConst (1 % 1))), (RationalConst (1 % 1))) (elifCondExpr <|> elseExpr) 
-      if cond == (RBinary Eq (RationalConst (1 % 1)) (RationalConst (1 % 1)))
-      then return $ exprIf
-      else if cond == (RBinary Ne (RationalConst (1 % 1)) (RationalConst (1 % 1)))
-           then error ("\nIf expression not in the format.\nPossible else statement missing.\n")
-           else do
-              exprElse <- getIfBlockExpr
-              return $ ExprIf cond exprIf exprElse
+eTerm :: Parser Expr
+eTerm = (try eTermL) <|> eTermR
 
 ifExpr =
-  do (cond, exprIf) <- ifCondExpr
-     exprElse <- getIfBlockExpr
+  do exprIf <- eTermR
+     reserved "if"
+     cond <- expression
+     reserved "else"
+     exprElse <- expression
      return $ ExprIf cond exprIf exprElse
 
 uniformIchoices = 
@@ -457,13 +439,14 @@ uniformIchoices =
            reservedOp "["
            list <- sepBy expression (symbol ",")
            reservedOp "]"
-           return $ Ichoices list
+           return $ IchoicesDist list
+           -- return $ Ichoices list
 
 notUniformIchoices = 
         do reservedOp "["
            list <- sepBy expression (symbol ",")
            reservedOp "]"
-           return $ INUchoices list
+           return $ INUchoicesDist list
 
 uniformIchoicesListComp = 
         do reserved "uniform"
@@ -472,7 +455,8 @@ uniformIchoicesListComp =
            symbol ".."
            r <- integer
            reservedOp "]"
-           return $ Ichoices [(RationalConst (x % 1)) | x <- [l..r]]
+           return $ IchoicesDist [(RationalConst (x % 1)) | x <- [l..r]]
+           -- return $ Ichoices [(RationalConst (x % 1)) | x <- [l..r]]
 
 uniformFromSet = 
         do reserved "uniform"
@@ -481,12 +465,12 @@ uniformFromSet =
            list <- sepBy expression (symbol ",")
            reservedOp "}"
            let values = fromList list
-           return $ SetIchoice (Eset values)
+           return $ SetIchoiceDist (Eset values)
 
 uniformSetVar = 
         do reserved "uniform"
            expr <- liftM Var identifier
-           return $ SetIchoice expr
+           return $ SetIchoiceDist expr
 
 getParam :: Integer -> [Expr] -> Expr
 getParam 0 ls = (head ls)
