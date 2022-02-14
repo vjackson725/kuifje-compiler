@@ -1,2 +1,3 @@
 cols1 = set {0, 1, 2};
 data1 = csv("100020.csv", cols1);
+data <- data1;

@@ -26,7 +26,7 @@ executable Kuifje-compiler
     Kuifje.Syntax
     Kuifje.Translator
     Kuifje.JsonPrint
-    --Kuifje.CsvLoader
+    Kuifje.CsvLoader
     -- Kuifje.TypeChecker
     Kuifje.Value
   -- other-extensions:
