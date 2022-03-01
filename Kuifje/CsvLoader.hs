@@ -6,6 +6,7 @@ import System.IO
 import System.IO.Unsafe
 import Data.IORef
 import Data.Ratio
+import qualified Data.Char as Ch
 
 import Kuifje.Value
 import Kuifje.Syntax
@@ -36,29 +37,105 @@ wordsWhen p s =  case dropWhile p s of
                       s' -> w : wordsWhen p s''
                             where (w, s'') = break p s'
 
-selectCols :: Integer -> [Integer] -> [String] -> [Expr]
-selectCols _ [] [] = []
-selectCols id cols val = let hdCols = head cols
+convertExprLsToText :: [Expr] -> String
+convertExprLsToText [] = ""
+convertExprLsToText ls = let hd = exprToStr (head ls)
+                             tl = convertExprLsToText (tail ls)
+                          in (hd ++ tl)
+                             
+isStrRational :: String -> Bool
+isStrRational "" = True
+isStrRational s = let hd = head s
+                   in if ((Ch.isDigit hd) || (hd == '.'))
+                      then (isStrRational (tail s))
+                      else False
+
+convertStrToRational :: String -> Rational
+convertStrToRational s = toRational (read s :: Float)
+
+selectCols :: String -> Integer -> [Integer] -> [String] -> [Expr]
+selectCols _ _ [] [] = []
+selectCols "Set" id cols val = let hdCols = head cols
                           in if id == hdCols
                              then let hdVal = head val
                                       tlCols = tail cols
                                       tlVal = tail val
-                                      tl = selectCols (id+1) tlCols tlVal
+                                      tl = selectCols "Set" (id+1) tlCols tlVal
                                    in ((Text hdVal) : tl)
-                             else (selectCols (id+1) cols (tail val))
+                             else (selectCols "Set" (id+1) cols (tail val))
+selectCols "Text" id cols val = let hdCols = head cols
+                          in if id == hdCols
+                             then let hdVal = head val
+                                      tlCols = tail cols
+                                      tlVal = tail val
+                                      tl = convertExprLsToText (selectCols "Text" (id+1) tlCols tlVal)
+                                   in if (length cols) == 1
+                                      then [(Text hdVal)]
+                                      else [(Text (hdVal ++ "," ++ tl))]
+                             else (selectCols "Text" (id+1) cols (tail val))
+selectCols "Type" id cols val = let hdCols = head cols
+                          in if id == hdCols
+                             then let hdVal = head val
+                                      tlCols = tail cols
+                                      tlVal = tail val
+                                      tl = selectCols "Type" (id+1) tlCols tlVal
+                                   in if (isStrRational hdVal)
+                                      then ((RationalConst (convertStrToRational hdVal)) : tl)
+                                      else ((Text hdVal) : tl)
+                             else (selectCols "Type" (id+1) cols (tail val))
 
-createExpressions :: [Integer] -> [String] -> [Expr]
-createExpressions _ [] = []
-createExpressions cols ls = let hd = head ls
-                                tl = createExpressions cols (tail ls)
-                                cl = wordsWhen (==',') hd
-                                vals = selectCols 0 cols cl
-                                set = S.fromList vals
-                             in (Eset set) : tl --error ("vals is:\n" ++ (show vals))--(Eset set) : tl
+
+createExpressions :: String -> [Integer] -> [String] -> [Expr]
+createExpressions _ _ [] = []
+createExpressions "Text" cols ls = let hd = head ls
+                                       tl = createExpressions "Text" cols (tail ls)
+                                       cl = wordsWhen (==',') hd
+                                       vals = selectCols "Text" 0 cols cl
+                                    in (head vals) : tl 
+createExpressions tpy cols ls = let hd = head ls
+                                    tl = createExpressions tpy cols (tail ls)
+                                    cl = wordsWhen (==',') hd
+                                    vals = selectCols tpy 0 cols cl
+                                    set = S.fromList vals
+                                 in (Eset set) : tl
+
+limitList :: Integer -> [Expr] -> [Expr]
+limitList 0 ls = ls
+limitList n ls = if (n-1) == 0
+                 then [(head ls)]
+                 else (head ls) : (limitList (n-1) (tail ls))
 
 exprToStr :: Expr -> String
 exprToStr (Text t) = t
 exprToStr e = error ("Invalid Filename:\n  " ++ (show e))
+
+lExprTolValues :: [Expr] -> [Value]
+lExprTolValues [] = []
+lExprTolValues ls =
+        let hd = exprToValue (head ls)
+            tl = lExprTolValues (tail ls)
+         in hd : tl
+
+exprToValue :: Expr -> Value
+exprToValue (RationalConst r) = (R r)
+exprToValue (Text t) = (T t)
+exprToValue (Neg a) = exprToValue (ABinary Multiply (RationalConst (-1 % 1)) a)
+exprToValue (BoolConst b) = (B b)
+exprToValue (ABinary Multiply (RationalConst a) (RationalConst b)) = (R (a * b))
+exprToValue (ABinary Divide (RationalConst a) (RationalConst b)) = (R (a / b))
+exprToValue (Eset ns) =
+   let e = S.elems ns
+       l = lExprTolValues e
+       s = S.fromList l
+    in (S s)
+exprToValue (IchoiceDist e1 e2 p) =
+   let v1 = exprToValue e1
+       v2 = exprToValue e2
+       (R r) = exprToValue p
+       p2 = (1 - r)
+       list = [(r, v1), (p2, v2)]
+    in (PD (S.fromDistinctAscList list))
+exprToValue e = error ("Expression cannot be converted to value:\n" ++ (show e))
 
 myVar :: IORef a -- polymorphic ref!
 myVar = unsafePerformIO $ newIORef undefined
@@ -93,15 +170,16 @@ exprToNumber (Var id) m = let (Eset expr) = readMap id m
                            in (listToInteger list)
 
 loadCSVs :: String -> Stmt -> (M.Map String Expr) -> (IO (Stmt, (M.Map String Expr)))
-loadCSVs fName (Csv identifier file columns) m = do let csvName = addPathtoFile fName (exprToStr file)
-                                                    fl <- readFile csvName 
-                                                    let rows = lines fl
-                                                    let cols = exprToNumber columns m
-                                                    let exprs = createExpressions cols rows
-                                                    let values = S.fromList exprs
-                                                    let expr = (SetIchoiceDist (Eset values))
-                                                    Prelude.return ((Assign identifier expr),m)
-                                                    --error ("exprS is:\n" ++ (show expr))
+loadCSVs fName (Csv identifier file columns limit tVal) m = do let csvName = addPathtoFile fName (exprToStr file)
+                                                               fl <- readFile csvName 
+                                                               let rows = lines fl
+                                                               let cols = exprToNumber columns m
+                                                               let tpy = exprToStr tVal
+                                                               let exprs = createExpressions tpy cols rows
+                                                               let (RationalConst r) = limit
+                                                               let l = numerator r
+                                                               let newExprs = limitList l exprs
+                                                               Prelude.return ((Assign identifier (IchoicesDist newExprs)),m)
 loadCSVs fName (Assign id expr) m = do putStr ""
                                        let newM = M.insert id expr m
                                        Prelude.return ((Assign id expr),newM)
@@ -126,13 +204,6 @@ loadCSVs fName (Kuifje.Syntax.While e body) m = do putStr ""
 loadCSVs fName s m = do putStr ""
                         Prelude.return (s,m)
 
---parseCSVs :: [Expr] -> IO Stmt
---parseCSVs file =
---        do program  <- readFile file
---           case parse statements "" program of
---                Left e  -> print e >> fail "parse error"
---                Right r -> return r
-
 getPreffix :: String -> String
 getPreffix str = let indexL = (L.findIndices (`elem` "/") str)
                     in if (L.length indexL > 0)
@@ -145,15 +216,3 @@ addPathtoFile fName csvName = ((getPreffix fName) ++ csvName)
 readCSVs :: String -> Stmt -> IO Stmt
 readCSVs fName stmts = do stmt <- (loadCSVs fName stmts M.empty)
                           Prelude.return (fst stmt)
-                       --do let csvName = addPathtoFile fName "100020.csv"
-                       --   file <- readFile csvName --"100020.csv" ReadMode
-                       --   error ("Content is:\n" ++ file)
- --error ("Called to" ++ (show stmts))
-
---createJson2 :: String -> [(String, (Dist (Dist Value)))] -> IO ()
---createJson2 fName values = do let s = 4
---                              let jContent = "{\n" ++ (variableJson2 s values) ++ "\n}"
---                              let jName = jsonName2 fName
---                              jsonFile <- openFile jName WriteMode
---                              hPutStrLn jsonFile jContent
---                              hClose jsonFile

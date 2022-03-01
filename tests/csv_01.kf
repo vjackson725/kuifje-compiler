@@ -1,3 +1,11 @@
-cols1 = set {0, 1, 2};
-data1 = csv("100020.csv", cols1);
-data <- data1;
+colsTx = set {0, 1, 2};
+dataDTx = csv("100020.csv", colsTx, 10, "Text");
+dataTx <- dataDTx;
+
+colsTy = set {0, 1, 2};
+dataDTy = csv("100020.csv", colsTy, 10, "Type");
+dataTy <- dataDTy;
+
+colsS = set {0, 1, 2};
+dataDS = csv("100020.csv", colsS, 10, "Set");
+dataS <- dataDS;

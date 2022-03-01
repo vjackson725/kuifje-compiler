@@ -362,8 +362,12 @@ readStmt =
      file <- expression
      reservedOp ","
      columns <- expression
+     reservedOp ","
+     limit <- expression
+     reservedOp ","
+     tVal <- expression
      reservedOp ")"
-     return $ Csv var file columns
+     return $ Csv var file columns limit tVal
 
 --
 -- Expressions

@@ -81,7 +81,7 @@ data Stmt = Seq [Stmt]
           | ReturnStmt [Expr]
           | CallStmt String [Expr] [String]
           | Support String Expr
-          | Csv String Expr Expr
+          | Csv String Expr Expr Expr Expr
           | Skip 
           | Leak Expr
           | Vis String
