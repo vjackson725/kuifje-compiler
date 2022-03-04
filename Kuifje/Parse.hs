@@ -58,6 +58,7 @@ languageDef =
                                       , "function"
                                       , "return"
                                       , "csv"
+                                      , "for"
                                       ]
 
             , Token.reservedOpNames = ["+"
@@ -84,6 +85,7 @@ languageDef =
                                       , "powerSet"
                                       , "in"
                                       , "nin"
+                                      , "filterSet"
                                       ]
             }
 
@@ -161,6 +163,7 @@ sTerm = (braces statements
          <|> assignStmt
          <|> ifStmt
          <|> whileStmt
+         <|> forStmt
          <|> skipStmt
          <|> vidStmt
          <|> leakStmt) << whiteSpace
@@ -236,7 +239,7 @@ indentation = do
 indentationBlock :: Monad m => ParsecT s u m Internal.Indentation
 indentationBlock = do
     pos <- getPosition
-    return $! Internal.Indentation {Internal.iLine = sourceLine pos, Internal.iColumn = ((sourceColumn pos) +  1)}
+    return $! Internal.Indentation {Internal.iLine = sourceLine pos, Internal.iColumn = ((sourceColumn pos) + 2)}
 
 -- | Verifies if the position is in the same position
 isSamePosition :: Internal.Indentation -> Internal.Indentation -> Bool
@@ -314,6 +317,19 @@ whileStmt =
      setInput (";" ++ input)
      return $ While cond stmt 
 
+forStmt :: Parser Stmt
+forStmt =
+  do ref <- indentationBlock
+     reserved "for"
+     var <- identifier
+     reservedOp "in"
+     set <- expression
+     reservedOp ":"
+     stmt <- codeBlock ref
+     input <- getInput
+     setInput (";" ++ input)
+     return $ For var set stmt
+
 assignStmt :: Parser Stmt
 assignStmt =
   do var  <- identifier
@@ -389,6 +405,7 @@ eOperators =
            Infix  (reservedOp "%"   >> return (ABinary Rem     )) AssocLeft,
            Infix  (reservedOp "^"   >> return (ABinary Pow     )) AssocLeft,
            Infix  (reservedOp "&"   >> return (ABinary Intersection)) AssocLeft,
+           Infix  (reservedOp "filterSet"   >> return (ABinary Filter)) AssocLeft,
            Infix  (reservedOp "-"   >> return (ABinary Subtract)) AssocLeft]
         , [Infix  (reservedOp "in"  >> return (SBinary In        )) AssocLeft,
            Infix  (reservedOp "nin"  >> return (SBinary NIn      )) AssocLeft,

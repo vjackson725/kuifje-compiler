@@ -1,0 +1,9 @@
+colsD = set {0, 1, 2};
+dataDD = csv("100020.csv", colsD, 30, "Text");
+dataD <- dataDD;
+
+colsE = set {0, 2};
+dataED = csv("100020.csv", colsE, 30, "Text");
+dataE <- dataED;
+
+sup = set dataE;

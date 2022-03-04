@@ -32,6 +32,22 @@ import Text.ParserCombinators.Parsec.Expr
 (*^*) :: (RealFrac a, RealFrac b) => a -> b -> a
 x *^* y = realToFrac $ realToFrac x ** realToFrac y
 
+isText :: Value -> Bool
+isText (T _) = True
+isText _ = False
+
+isSet :: Value -> Bool
+isSet (S _) = True
+isSet _ = False
+
+isBool :: Value -> Bool
+isBool (B _) = True
+isBool _ = False
+
+isRational :: Value -> Bool
+isRational (R _) = True
+isRational _ = False
+
 aOperatorWarpper op (R x) (R y) = 
         case op of 
           Add      -> R $ (+) x y
@@ -41,12 +57,43 @@ aOperatorWarpper op (R x) (R y) =
           Pow      -> R $ x *^* y 
           IDivide  -> R $ (div (truncate x) (truncate y)) % 1
           Rem      -> R $ (rem (truncate x) (truncate y)) % 1
-          
+
+aOperatorWarpper op (T x) (S y) =
+        case op of
+          Filter    -> S $ DSET.filter (\n -> if (isText n)
+                                              then let (T v) = n
+                                                    in isSubsequenceOf x v
+                                              else False) y
+          otherwise -> error "Unknow set operation"
+
+aOperatorWarpper op (R x) (S y) =
+        case op of
+          Filter    -> S $ DSET.filter (\n -> if (isRational n)
+                                              then let (R v) = n
+                                                    in (x == v)
+                                              else False) y
+          otherwise -> error "Unknow set operation"
+
+aOperatorWarpper op (B x) (S y) =
+        case op of
+          Filter    -> S $ DSET.filter (\n -> if (isBool n)
+                                              then let (B v) = n
+                                                    in (x == v)
+                                              else False) y
+          otherwise -> error "Unknow set operation"
+
 aOperatorWarpper op (S x) (S y) = 
         case op of 
           Add      -> S $ DSET.union x y
-          Subtract -> S $ x DSET.\\ y
+          Subtract -> let el = x DSET.\\ y
+                       in if ((DSET.size el) > 1)
+                          then S $ el
+                          else (head (DSET.elems el))
           Intersection -> S $ DSET.intersection x y
+          Filter    -> S $ DSET.filter (\n -> if (isSet n)
+                                              then let (S v) = n
+                                                    in DSET.isSubsetOf x v
+                                              else False) y
           otherwise -> error "Unknow set operation"
 
 aOperator op d1 d2 = 
@@ -96,11 +143,15 @@ sBinOperatorWrapper op x (S y) =
     NIn      -> DSET.notMember x y
     otherwise -> error "Unknow set membership operation"
 
+sBinOperatorWrapper op x y =
+  case op of
+    In       -> (x == y)
+    NIn      -> (x /= y)
+    otherwise -> error "Unknow set membership operation"
+
 sBinOperator op d1 d2 =
   D $ fromListWith (+) [((B (sBinOperatorWrapper op x y)), p * q) | (x, p) <- toList $ runD d1,
                                                                     (y, q) <- toList $ runD d2]
-
-
 updateProbs :: [(Prob, Value)] -> Prob -> [(Prob, Value)]
 updateProbs [] _ = []
 updateProbs ls p = let hd = head ls
@@ -687,35 +738,41 @@ runLivenessAnalysis m =
            error ("\n\nInvalid Program. Use of undeclared variable.\n No debug information found.\n")
          else True
 
+isSetNEmpty :: Expr -> Bool
+isSetNEmpty (Eset e) = ((DSET.size e) > 0)
+isSetNEmpty _ = False
+
 translateExecKuifje :: Stmt -> Map.Map String (Stmt, [String], [Expr]) -> Map.Map String Expr -> MonadValue -> (MonadValue, Map.Map String (Stmt, [String], [Expr]), Map.Map String Expr)
+-- Sequence Statements
 translateExecKuifje (Seq []) fBody fCntx list = (list, fBody, fCntx)
 translateExecKuifje (Seq ls) fBody fCntx list = 
         let (hdRes, hdFBody, hdFCntx) = (translateExecKuifje (head ls) fBody fCntx list)
-        --let (hdRes, hdFBody, hdFCntx) = (translateExecKuifje (head ls) fBody fCntx (L []))
             (tlRes, tlFBody, tlFCntx) = (translateExecKuifje (Seq (tail ls)) hdFBody hdFCntx hdRes)
-        --    (tlRes, tlFBody, tlFCntx) = (translateExecKuifje (Seq (tail ls)) hdFBody hdFCntx (L []))
-        --    monadList = concatMonadValues hdRes tlRes
-        -- in (monadList, tlFBody, tlFCntx)
-        -- in (tlRes, tlFBody, tlFCntx)
          in (translateExecKuifje (Seq (tail ls)) hdFBody hdFCntx hdRes)
+-- Assign Statements
 translateExecKuifje (Assign id expr) fBody fCntx list = 
         let newFCntx = Map.insert id expr fCntx
             monadList = concatMonadValues list (A id expr)
          in (monadList, fBody, newFCntx)
-         --in (monadList, newFBody, newFCntxA)
+-- Support Statements
 translateExecKuifje (Support id (Var idexp)) fBody fCntx list = 
         let gammaL = createMonnad list
             kuifje = hysem gammaL (uniform [E.empty])
             executed = exec idexp kuifje
             support = getSupportFromHyper executed
             dist = recoverSupportAsDistList support
-            setExpr = (INUchoices dist)
-            (newRes, newFBody, newFCntx) = translateExecKuifje (Assign id setExpr) fBody fCntx list
-         in (newRes, newFBody, newFCntx)
+         in if ((length dist) == 1)
+            then let setExpr = valueToExpr (snd (convertTuple (head dist)))
+                     (newRes, newFBody, newFCntx) = translateExecKuifje (Assign id setExpr) fBody fCntx list
+                  in (newRes, newFBody, newFCntx)
+            else let setExpr = (INUchoices dist)
+                     (newRes, newFBody, newFCntx) = translateExecKuifje (Assign id setExpr) fBody fCntx list
+                  in (newRes, newFBody, newFCntx)
 translateExecKuifje (Support id exp) fBody fCntx list =
         let distName = "DIST." ++ id
             (newRes, newFBody, newFCntx) = translateExecKuifje (Assign distName exp) fBody fCntx list
          in translateExecKuifje (Support id (Var distName)) newFBody newFCntx newRes
+-- Function Statements
 translateExecKuifje (FuncStmt name body lInput) fBody fCntx list =
         let (Seq insts) = body
             lOutput = findReturns insts
@@ -723,8 +780,10 @@ translateExecKuifje (FuncStmt name body lInput) fBody fCntx list =
             stmt = fst3 (translateExecKuifje (Kuifje.Syntax.Skip) fBody fCntx list)
             monadList = concatMonadValues list stmt
          in (monadList, nMap, fCntx)
--- Returns were processed by FuncStmt, and should be skiped at this point:
+-- Return Statements
+--   Returns were processed by FuncStmt, and should be skiped at this point:
 translateExecKuifje (ReturnStmt outputs) fBody fCntx list = (list, fBody, fCntx)
+-- Call Statements
 translateExecKuifje (CallStmt name lInput lOutput) fBody fCntx list =
         let base = (getFuncBody name fBody)
             baseStmt = fst3 base
@@ -735,26 +794,62 @@ translateExecKuifje (CallStmt name lInput lOutput) fBody fCntx list =
             inCntxStmt = addInputCntx name fInput lInput outCntxStmt
          --in error ("Call is:\n" ++ (show inCntxStmt))
          in translateExecKuifje inCntxStmt fBody fCntx list
+-- If statements
 translateExecKuifje (Kuifje.Syntax.If e s1 s2) fBody fCntx list =
         let listTrue = (fst3 (translateExecKuifje s1 fBody fCntx (L [])))
             listFalse = (fst3 (translateExecKuifje s2 fBody fCntx (L [])))
             (newRes, newFBody, newFCntx) = ((C e listTrue listFalse), fBody, fCntx)
             monadList = concatMonadValues list newRes
          in (monadList, newFBody, newFCntx)
+-- While Statements
 translateExecKuifje (Kuifje.Syntax.While e body) fBody fCntx list =
         -- If a variable controls a loop, it is leaked to the adversary:
         let (lBody, newFBody, newFCntx) = translateExecKuifje body fBody fCntx (O e)
             monadList = concatMonadValues list (W e lBody)
          in (monadList, newFBody, newFCntx)
+-- For Statements
+translateExecKuifje (For var (Var idSet) body) fBody fCntx list =
+        -- Check if the set is empty
+        let val = getCntxExpr idSet fCntx
+         in if (isSetNEmpty val)
+            -- Unroll the first element
+            then let (Eset elm) = val
+                     ls = DSET.elems elm
+                     expr = (head ls)
+                     newSet = (Eset (DSET.fromList (tail ls)))
+                     newFCntx = Map.insert var expr fCntx
+                     monadList = concatMonadValues list (A var expr)
+                     (lNext, newFBody2, newFCntx2) = translateExecKuifje body fBody newFCntx monadList
+                  in translateExecKuifje (For var newSet body) newFBody2 newFCntx2 lNext
+            else (translateExecKuifje Kuifje.Syntax.Skip fBody fCntx list)
+translateExecKuifje (For var set body) fBody fCntx list =
+        -- Check if the set is empty
+         if (isSetNEmpty set)
+         -- Unroll the first element
+         then let (Eset elm) = set
+                  ls = DSET.elems elm
+                  expr = (head ls)
+                  newSet = (Eset (DSET.fromList (tail ls)))
+                  newFCntx = Map.insert var expr fCntx
+                  monadList = concatMonadValues list (A var expr)
+                  --(monadVar, newFBody, newFCntx) = translateExecKuifje (Assign var el) fBody fCntx list
+                  (lNext, newFBody2, newFCntx2) = translateExecKuifje body fBody newFCntx monadList
+               in translateExecKuifje (For var newSet body) newFBody2 newFCntx2 lNext
+         else (translateExecKuifje Kuifje.Syntax.Skip fBody fCntx list)
+-- Skip Statements
 translateExecKuifje Kuifje.Syntax.Skip fBody fCntx list = ((concatMonadValues list (M skip)), fBody, fCntx)
+-- Leak Statements
 translateExecKuifje (Leak e) fBody fCntx list = ((concatMonadValues list (O e)), fBody, fCntx)
+-- Vis Statements
 translateExecKuifje (Vis s) fBody fCntx list = ((concatMonadValues list (M undefined)), fBody, fCntx)
+-- External Choice Statements
 translateExecKuifje (Echoice s1 s2 p) fBody fCntx list = 
         let listTrue = (fst3 (translateExecKuifje s1 fBody fCntx (L [])))
             listFalse = (fst3 (translateExecKuifje s2 fBody fCntx (L [])))
             (newRes, newFBody, newFCntx) = ((E listTrue listFalse p), fBody, fCntx)
             monadList = concatMonadValues list newRes
          in (monadList, newFBody, newFCntx)
+-- Sampling Statements
 translateExecKuifje (Sampling id (Var idexp)) fBody fCntx list =
         let exprD = getCntxExpr idexp fCntx
             expr = sampleFromDist exprD
@@ -766,6 +861,8 @@ translateExecKuifje (Sampling id exprD) fBody fCntx list =
             newFCntx = Map.insert id expr fCntx
             monadList = concatMonadValues list (A id expr)
          in (monadList, fBody, newFCntx)
+-- Default Value - Case a Statement is not found
+translateExecKuifje stmt _ _ list = error ("Invalid Statement:\n" ++ (show stmt) ++ "\nList:\n" ++ (monadType list))
 
 isReturnStmt :: Stmt -> Bool
 isReturnStmt (ReturnStmt _) = True

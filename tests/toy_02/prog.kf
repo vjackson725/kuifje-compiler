@@ -1,0 +1,37 @@
+colsEnv = set {0, 1, 2};
+dataEnvD = csv("toy_02.txt", colsEnv, 0, "Text");
+envPrior <- dataEnvD;
+
+environment <- dataEnvD;
+
+colsSt = set {0};
+dataStD = csv("toy_02.txt", colsSt, 0, "Text");
+strategy <- dataStD;
+
+secretVal = set environment;
+secret0Set = "0," filterSet secretVal;
+secret1Set = "1," filterSet secretVal;
+secret0 <- uniform secret0Set;
+secret1 <- uniform secret1Set;
+
+setV = set { set {"0", secret0} , set {"1", secret1} };
+// secret <- mapE strategy setV;
+secret = 0;
+strategyS = set strategy;
+for el in setV:
+   if (strategy in el):
+     secret = el - strategyS;
+   else:
+     skip;
+
+colsCh = set {0, 2};
+dataChD = csv("toy_02.txt", colsCh, 0, "Text");
+channel <- dataChD;
+
+// TO-DO: Implements the equivalent of y.
+setC = set channel;
+y = 0;
+for el in setC:
+  y = el if (el strIsSub secret) else y;
+
+leak(y);

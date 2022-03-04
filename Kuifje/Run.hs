@@ -18,9 +18,12 @@ import Language.Kuifje.Distribution
 import Language.Kuifje.PrettyPrint
 import Language.Kuifje.Semantics
 import Language.Kuifje.Syntax
+import Language.Kuifje.ShallowConsts
 import Text.PrettyPrint.Boxes (printBox)
 import Prelude hiding ((!!), fmap, (>>=))
 import qualified Data.Map as Map
+
+import Data.IORef
 
 getFrom g s | Just x <- E.lookup g s = x
             | otherwise = error ("Not going to happend " ++ s)
@@ -50,6 +53,7 @@ runHyper s ls = do tmp <- parseFile s
                    let (env, _) = (toList $ runD kuifje) !! 0
                    let (gamma, _) = ((toList $ runD $ env) !! 0)
                    let all_var = E.allVar gamma
+                   writeDecimalPrecision 6
                    if v then
                       do let output = [(x, Kuifje.Run.project x kuifje) | x <- all_var]
                          readFlags ls s output

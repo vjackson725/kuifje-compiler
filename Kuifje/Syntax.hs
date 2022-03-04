@@ -70,6 +70,7 @@ data ABinOp = Add
             | IDivide 
             | Rem
             | Intersection
+            | Filter
             deriving (Show, Ord, Eq)
 
 data Stmt = Seq [Stmt]
@@ -77,6 +78,7 @@ data Stmt = Seq [Stmt]
           | Sampling String Expr
           | If Expr Stmt Stmt
           | While Expr Stmt
+          | For String Expr Stmt
           | FuncStmt String Stmt [String] --[Expr]
           | ReturnStmt [Expr]
           | CallStmt String [Expr] [String]
