@@ -15,7 +15,7 @@ secret0 <- uniform secret0Set;
 secret1 <- uniform secret1Set;
 
 setV = set { set {"0", secret0} , set {"1", secret1} };
-// secret <- mapE strategy setV;
+secret <- mapE strategy setV;
 secret = 0;
 strategyS = set strategy;
 for el in setV:

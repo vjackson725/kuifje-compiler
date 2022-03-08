@@ -278,16 +278,12 @@ funcStmt =
   do ref <- indentationBlock
      reserved "def"
      name <- identifier
-     whiteSpace
-     -- Input Parameters
-     inputs <- sepBy (parens identifier) (symbol ",")
-     whiteSpace
-     reserved ":"
+     inputs <- parens (sepBy identifier (symbol ","))
+     reservedOp ":"
      body <- codeBlock ref
      -- Output Parameters - Only in the end of the function:
      input <- getInput
      setInput (";" ++ input)
---     error ("Body Func is:\n" ++ (show input) ++ "\n\n")
      return $ FuncStmt name body inputs
 
 returnStmt :: Parser Stmt

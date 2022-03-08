@@ -1,0 +1,34 @@
+def push (prior, channel) :
+  elch = set channel;
+  elpr = set prior;
+  dist = 0;
+  for e in elch:
+    if (e strIsSub prior):
+      eSet = (e filterSet elpr);
+      dist <- uniform eSet;
+    else:
+      skip;
+  return dist;
+
+
+colsPri = set {0, 1};
+dataPriD = csv("base.csv", colsPri, 0, "Text");
+prior <- dataPriD;
+
+colsCh = set {1};
+dataChD = csv("base.csv", colsCh, 0, "Text");
+channel <- dataChD;
+
+elch = set channel;
+elpr = set prior;
+i = 0;
+dist = 0;
+for e in elch:
+  if (e strIsSub prior):
+    eSet = (e filterSet elpr);
+    dist <- uniform eSet;
+  else:
+    skip;
+  i = i + 1;
+
+distF = push(prior, channel);

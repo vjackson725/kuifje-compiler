@@ -189,43 +189,55 @@ createNewDist v1 v2 p =
        newList = newEl1 ++ newEl2
     in (PD (DSET.fromDistinctAscList newList))
 
-exprToValue :: Expr -> Value
-exprToValue (RationalConst r) = (R r)
-exprToValue (Text t) = (T t)
-exprToValue (Neg a) = exprToValue (ABinary Multiply (RationalConst (-1 % 1)) a)
-exprToValue (BoolConst b) = (B b)
-exprToValue (ABinary Multiply (RationalConst a) (RationalConst b)) = (R (a * b))
-exprToValue (ABinary Divide (RationalConst a) (RationalConst b)) = (R (a / b))
-exprToValue (Eset ns) = 
+distFromMapVals :: [(Value, Prob)] -> [(Prob, Value)]
+distFromMapVals [] = []
+distFromMapVals ls = let (v, p) = (head ls)
+                         tl = distFromMapVals (tail ls)
+                      in (p, v) : tl
+
+exprToValue :: Expr -> (Dist Value) -> Value
+--exprToValue (Var id) ev = let vals = distFromMapVals (assocs (unpackD ev))
+--                           in  (PD (DSET.fromDistinctAscList vals))
+                           --in if ((length vals) == 1)
+                           --   then (snd (head (vals)))
+                           --   else (PD (DSET.fromDistinctAscList vals))
+exprToValue (RationalConst r) _ = (R r)
+exprToValue (Text t) _ = (T t)
+exprToValue (Neg a) ev = exprToValue (ABinary Multiply (RationalConst (-1 % 1)) a) ev
+exprToValue (BoolConst b) _ = (B b)
+exprToValue (ABinary Multiply (RationalConst a) (RationalConst b)) _ = (R (a * b))
+exprToValue (ABinary Divide (RationalConst a) (RationalConst b)) _ = (R (a / b))
+exprToValue (Eset ns) ev = 
    let e = DSET.elems ns
-       l = lExprTolValues e
+       l = lExprTolValues e ev
        s = DSET.fromList l
     in (S s)
-exprToValue (IchoiceDist e1 e2 p) =
-   let v1 = exprToValue e1
-       v2 = exprToValue e2
-       (R r) = exprToValue p
+exprToValue (IchoiceDist e1 e2 p) ev =
+   let v1 = exprToValue e1 ev
+       v2 = exprToValue e2 ev
+       (R r) = exprToValue p ev
        p2 = (1 - r)
        list = [(r, v1), (p2, v2)]
     in (PD (DSET.fromDistinctAscList list))
-exprToValue e = error ("Invalid exprToValue:\n" ++ (show e))
+exprToValue e _ = error ("Invalid exprToValue:\n" ++ (show e))
 
-lExprTolValues :: [Expr] -> [Value]
-lExprTolValues [] = []
-lExprTolValues ls =
-        let hd = exprToValue (head ls)
-            tl = lExprTolValues (tail ls)
+lExprTolValues :: [Expr] -> (Dist Value) -> [Value]
+lExprTolValues [] _ = []
+lExprTolValues ls ev =
+        let hd = exprToValue (head ls) ev
+            tl = lExprTolValues (tail ls) ev
          in hd : tl
 
-createDistList :: Prob -> [Expr] -> [(Prob, Value)]
-createDistList _ [] = []
-createDistList prob ls = let hd = exprToValue (head ls)
-                             tl = createDistList prob (tail ls)
-                          in [(prob, hd)] ++ tl
+createDistList :: Prob -> [Expr] -> (Dist Value) -> [(Prob, Value)]
+createDistList _ [] _ = []
+createDistList prob ls ev = let hd = exprToValue (head ls) ev
+                                tl = createDistList prob (tail ls) ev
+                             in [(prob, hd)] ++ tl
 
 convertTuple :: Expr -> (Prob, Value)
-convertTuple (Tuple e p) = let val = exprToValue e
-                               (R pr) = exprToValue p
+convertTuple (Tuple e p) = let ev = (evalE (RationalConst (0 % 1))) E.empty
+                               val = exprToValue e ev
+                               (R pr) = exprToValue p ev
                             in (pr, val)
 
 convertINUlist :: [Expr] -> [(Prob, Value)]
@@ -345,9 +357,12 @@ evalE (Ichoice e1 e2 p) = \s ->
       d2 = D $ Data.Map.Strict.map (*(1-p')) $ runD e2'
    in D $ unionWith (+) (runD d1) (runD d2)
 evalE (IchoiceDist e1 e2 p) = \s -> 
-  let v1 = exprToValue e1
-      v2 = exprToValue e2
-      (R r) = exprToValue p
+  let v1' = (evalE e1) s
+      v2' = (evalE e2) s
+      p' = (evalE p) s
+      v1 = exprToValue e1 v1'
+      v2 = exprToValue e2 v2'
+      (R r) = exprToValue p p'
       dist = createNewDist v1 v2 r
    in return dist
 evalE (Ichoices ls) = 
@@ -358,8 +373,9 @@ evalE (Ichoices ls) =
                           (Ichoices (tail ls)) 
                           (RationalConst (1 % (toInteger (length ls))))
 evalE (IchoicesDist ls) = \s -> 
-   let p = (1 % (toInteger (length ls)))
-       vals = createDistList p ls
+   let ev = (evalE (Ichoices ls)) s
+       p = (1 % (toInteger (length ls)))
+       vals = createDistList p ls ev
        dist = (PD (DSET.fromDistinctAscList vals))
     in return dist
 evalE (Tuple e p) = \s ->
