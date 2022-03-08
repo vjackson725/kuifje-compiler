@@ -749,10 +749,9 @@ livenessAnalysis (W e b) vars =
          in ((eVal && bVal), vars)
 
 runLivenessAnalysis :: MonadValue -> Bool
-runLivenessAnalysis m =  
-         if (fst (livenessAnalysis m Map.empty)) == False then
-           error ("\n\nInvalid Program. Use of undeclared variable.\n No debug information found.\n")
-         else True
+runLivenessAnalysis m = if (fst (livenessAnalysis m Map.empty)) == False
+                        then error ("\n\nInvalid Program. Use of undeclared variable.\n No debug information found.\n")
+                        else True
 
 isSetNEmpty :: Expr -> Bool
 isSetNEmpty (Eset e) = ((DSET.size e) > 0)
@@ -936,6 +935,7 @@ updateID :: String -> Stmt -> Stmt
 updateID fName (Assign id expr) = (Assign (fName ++ "." ++ id) expr)
 updateID fName (Sampling id expr) = (Sampling (fName ++ "." ++ id) expr)
 updateID fName (Support id expr) = (Support (fName ++ "." ++ id) expr)
+updateID fName (For id expr body) = (For (fName ++ "." ++ id) expr body)
 updateID fName e = e
 
 updateExpression :: String -> Expr -> Expr
@@ -991,8 +991,13 @@ updateExpression fName (RBinary op e1 e2) =
      let newe1 = (updateExpression fName e1)
          newe2 = (updateExpression fName e2)
      in (RBinary op newe1 newe2)
--- Support to Set not provided.
+updateExpression fName (SetIchoiceDist e) = let newExpr = (updateExpression fName e)
+                                             in (SetIchoiceDist newExpr)
+updateExpression fName (SetIchoice e) = let newExpr = (updateExpression fName e)
+                                         in (SetIchoice newExpr) 
 updateExpression fName e = e
+
+
 updateStmtList :: String -> [Stmt] -> [Stmt]
 updateStmtList fName [] = []
 updateStmtList fName ls = (updateStmtUses fName (head ls)) : (updateStmtList fName (tail ls))
@@ -1020,6 +1025,10 @@ updateStmtUses fName (Sampling id expr) =
 updateStmtUses fName (Support id expr) =       
      let newexpr = (updateExpression fName expr)
      in (updateID fName (Support id newexpr))
+updateStmtUses fName (For var (Var idSet) body) =
+     let newBody = (updateStmtUses fName body)
+         newIdSet = (updateExpression fName (Var idSet))
+     in (updateID fName (For var newIdSet newBody))
 updateStmtUses fName stmt = stmt
 
 fst3 :: (a, b, c) -> a
