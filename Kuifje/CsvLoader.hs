@@ -96,7 +96,7 @@ createExpressions "Unique Text" id cols ls = let hd = head ls
                                                  tl = createExpressions "Unique Text" (id + 1) cols (tail ls)
                                                  cl = wordsWhen (==',') hd
                                                  (Text vals) = head (selectCols "Text" 0 cols cl)
-                                                 uVal = (show id) ++ "-" ++ vals
+                                                 uVal = (show id) ++ "," ++ vals
                                               in (Text uVal) : tl
 createExpressions tpy _ cols ls = let hd = head ls
                                       tl = createExpressions tpy 0 cols (tail ls)
