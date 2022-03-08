@@ -85,19 +85,25 @@ selectCols "Type" id cols val = let hdCols = head cols
                              else (selectCols "Type" (id+1) cols (tail val))
 
 
-createExpressions :: String -> [Integer] -> [String] -> [Expr]
-createExpressions _ _ [] = []
-createExpressions "Text" cols ls = let hd = head ls
-                                       tl = createExpressions "Text" cols (tail ls)
-                                       cl = wordsWhen (==',') hd
-                                       vals = selectCols "Text" 0 cols cl
-                                    in (head vals) : tl 
-createExpressions tpy cols ls = let hd = head ls
-                                    tl = createExpressions tpy cols (tail ls)
-                                    cl = wordsWhen (==',') hd
-                                    vals = selectCols tpy 0 cols cl
-                                    set = S.fromList vals
-                                 in (Eset set) : tl
+createExpressions :: String -> Integer -> [Integer] -> [String] -> [Expr]
+createExpressions _ _ _ [] = []
+createExpressions "Text" _ cols ls = let hd = head ls
+                                         tl = createExpressions "Text" 0 cols (tail ls)
+                                         cl = wordsWhen (==',') hd
+                                         vals = selectCols "Text" 0 cols cl
+                                      in (head vals) : tl 
+createExpressions "Unique Text" id cols ls = let hd = head ls
+                                                 tl = createExpressions "Unique Text" (id + 1) cols (tail ls)
+                                                 cl = wordsWhen (==',') hd
+                                                 (Text vals) = head (selectCols "Text" 0 cols cl)
+                                                 uVal = (show id) ++ "-" ++ vals
+                                              in (Text uVal) : tl
+createExpressions tpy _ cols ls = let hd = head ls
+                                      tl = createExpressions tpy 0 cols (tail ls)
+                                      cl = wordsWhen (==',') hd
+                                      vals = selectCols tpy 0 cols cl
+                                      set = S.fromList vals
+                                   in (Eset set) : tl
 
 limitList :: Integer -> [Expr] -> [Expr]
 limitList 0 ls = ls
@@ -175,7 +181,7 @@ loadCSVs fName (Csv identifier file columns limit tVal) m = do let csvName = add
                                                                let rows = lines fl
                                                                let cols = exprToNumber columns m
                                                                let tpy = exprToStr tVal
-                                                               let exprs = createExpressions tpy cols rows
+                                                               let exprs = createExpressions tpy 1 cols rows
                                                                let (RationalConst r) = limit
                                                                let l = numerator r
                                                                let newExprs = limitList l exprs

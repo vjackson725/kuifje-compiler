@@ -11,7 +11,7 @@ def push(prior, channel):
   return dist;
 
 colsPri = set {0, 1};
-dataPriD = csv("base.csv", colsPri, 0, "Text");
+dataPriD = csv("base.csv", colsPri, 0, "Unique Text");
 prior <- dataPriD;
 
 colsCh = set {1};
