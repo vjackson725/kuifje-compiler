@@ -96,6 +96,8 @@ aOperatorWarpper op (S x) (S y) =
                                               else False) y
           otherwise -> error "Unknow set operation"
 
+aOperatorWarpper op a b = error ("Unknow operation " ++ (show op) ++ " <> " ++ (show a) ++ " <> " ++ (show b))
+
 aOperator op d1 d2 = 
   D $ fromListWith (+) [((aOperatorWarpper op x y), p * q) | (x, p) <- toList $ runD d1,
                                                              (y, q) <- toList $ runD d2]
