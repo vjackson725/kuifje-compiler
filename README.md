@@ -42,4 +42,4 @@ This example demonstrates that there is a biased coin that you do not know which
 
 ## Running the compiler interactively using GHCI
 
-[GHCI](https://github.com/gleisonsdm/kuifje-compiler/blob/master/ghci_guide.md)
+[Interactive compilation guide using GHCI](https://github.com/gleisonsdm/kuifje-compiler/blob/master/ghci_guide.md)
