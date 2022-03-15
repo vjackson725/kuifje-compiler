@@ -10,7 +10,7 @@ The process was tested on ubuntu 20.04.
 
 ## Setup
 
-To set up the Kuifje compiler, rune the following commands:
+To set up the Kuifje compiler, run the following commands:
 ```
 git submodule init
 git submodule update
@@ -39,3 +39,7 @@ while i < 2:
 ```
 
 This example demonstrates that there is a biased coin that you do not know which side bias to. It may 0.7 bias toward the head or 0.3 bias toward the head. By flipping the coin twice and leak the coin flip result, how much information you adversary would know about which way the coin bias toward. 
+
+## Running the compiler interactively using GHCI
+
+[GHCI](https://github.com/gleisonsdm/kuifje-compiler/blob/master/ghci_guide.md)
