@@ -14,6 +14,7 @@ type Prob = Rational
 
 -- | Distribution data type.
 newtype Dist a = D { runD :: Map a Prob }
+  deriving (Show)
 
 -- | Type alias for hyper-distributions.
 type Hyper a = Dist (Dist a)
