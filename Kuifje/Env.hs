@@ -5,6 +5,7 @@ module Kuifje.Env ( Env(..)
                  , add
                  , addAll
                  , allVar
+                 , envFromList
                  ) where
 
 import qualified Data.Map as M
@@ -14,7 +15,7 @@ import Data.Monoid
 import Prelude hiding (lookup)
 
 newtype Env e = Env (M.Map String e) 
-        deriving (Functor, Foldable, Traversable, Show, Eq, Ord)
+    deriving (Functor, Foldable, Traversable, Show, Eq, Ord)
 
 empty :: Env e
 empty = Env M.empty
@@ -33,3 +34,6 @@ unpackM (Env env) = env
 
 allVar :: Env e -> [String]
 allVar (Env env) = [ s | (s, _) <- M.toList env]
+
+envFromList :: [(String,e)] -> Env e
+envFromList xs = Env (M.fromList xs)

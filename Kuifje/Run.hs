@@ -14,7 +14,7 @@ import System.Environment
 import System.IO 
 import Data.Map.Strict
 import Data.List
-import Language.Kuifje.Distribution
+import Language.Kuifje.Distribution hiding (return)
 import Language.Kuifje.PrettyPrint
 import Language.Kuifje.Semantics
 import Language.Kuifje.Syntax
@@ -41,25 +41,24 @@ readFlags [] fName _ = putStrLn $ ""
 readFlags ls fName variables = do processFlag (head ls) fName variables
                                   readFlags (tail ls) fName variables
 
-runHyper :: String -> [String] -> IO ()
-runHyper s ls = do tmp <- parseFile s
-                   let m = Map.empty
-                   let e = Map.empty
-                   st <- readCSVs s tmp
-                   let l = fst3 (translateExecKuifje st m e (L []))
-                   let v = runLivenessAnalysis l
-                   let g = createMonnad l 
-                   let kuifje = hysem g (uniform [E.empty])
-                   let (env, _) = (toList $ runD kuifje) !! 0
-                   let (gamma, _) = ((toList $ runD $ env) !! 0)
-                   let all_var = E.allVar gamma
-                   writeDecimalPrecision 6
-                   if v then
-                      do let output = [(x, Kuifje.Run.project x kuifje) | x <- all_var]
-                         readFlags ls s output
-                         outputL output 
-                        --outputL [(x, Kuifje.Run.project x kuifje) | x <- all_var]
-                   else error ("\n\nCompilation fatal error.\n\n")
+--runHyper :: String -> [String] -> IO ()
+--runHyper s ls = do tmp <- parseFile s
+--                   let m = Map.empty
+--                   let e = Map.empty
+--                   st <- readCSVs s tmp
+--                   let l = fst3 (translateExecKuifje st m e (L []))
+--                   let v = runLivenessAnalysis l
+--                   let g = createMonnad l 
+--                   let kuifje = hysem g (uniform [E.empty])
+--                   let (env, _) = (toList $ runD kuifje) !! 0
+--                   let (gamma, _) = ((toList $ runD $ env) !! 0)
+--                   let all_var = E.allVar gamma
+--                   writeDecimalPrecision 6
+--                   if v then
+--                      do let output = [(x, Kuifje.Run.project x kuifje) | x <- all_var]
+--                         readFlags ls s output
+--                         outputL output 
+--                   else error ("\n\nCompilation fatal error.\n\n")
 
 outputL :: (Ord a, Boxable a) => [(String, Hyper a)] -> IO ()
 outputL ls =
@@ -72,5 +71,34 @@ outputL ls =
       putStrLn ""
   ) ls
 
-runFile :: String -> [String] -> IO ()
-runFile s ls = runHyper s ls
+compileFile filename param =
+  do
+    file <- parseFile filename
+    let map1 = Map.empty
+    let map2 = Map.empty
+    st <- readCSVs filename file
+    let ast =  fst3 (translateExecKuifje st map1 map2 (L []))
+    return ast
+
+runFile :: String -> [String] -> Dist Gamma -> IO (Hyper Gamma)
+runFile filename param distrib =
+  do
+    ast <- compileFile filename param
+    let v = runLivenessAnalysis ast
+    let monadAst = createMonnad ast
+    if v then
+      do return (hysem monadAst distrib)
+    else error ("\n\nCompilation fatal error.\n\n")
+
+runFileDefaultParams :: String -> [String] -> IO ()
+runFileDefaultParams s param =
+  do
+    hyper <- runFile s param (uniform [E.empty])
+    let (env, _) = (toList $ runD hyper) !! 0
+    let (gamma, _) = ((toList $ runD $ env) !! 0)
+    let all_var = E.allVar gamma
+    writeDecimalPrecision 6
+    let output = [(x, Kuifje.Run.project x hyper) | x <- all_var]
+    readFlags param s output
+    outputL output
+

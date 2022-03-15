@@ -10,6 +10,8 @@ import Numeric
 import Language.Kuifje.PrettyPrint
 import Language.Kuifje.Distribution
 
+import Prelude hiding ((<>))
+
 import Kuifje.Env
 
 
@@ -21,7 +23,13 @@ instance Boxable (Value) where
   toBox (PD x) = text "PD" <+> (toBox $ S.elems x)
 
 instance Boxable (Env Value) where
-  toBox (Env m) = toBox $ M.elems m
+  toBox (Env m) =
+    text "{"
+      <+> punctuateH left (text ", ")
+        (map
+          (\(x,v) -> text x <> text ":" <+> toBox v)
+          (M.assocs m))
+      <+> text "}"
 
 instance (Boxable a, Boxable b) => Boxable (Either a b) where
   toBox (Left x) = text "Left" <+> toBox x

@@ -26,3 +26,4 @@ dataM2D = csv("base.csv", colsM2, 0, "Text");
 m2 <- dataM2D;
 
 distM2 = channel(datasetM2, m2);
+
