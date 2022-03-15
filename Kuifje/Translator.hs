@@ -86,9 +86,11 @@ aOperatorWarpper op (S x) (S y) =
         case op of 
           Add      -> S $ DSET.union x y
           Subtract -> let el = x DSET.\\ y
-                       in if ((DSET.size el) > 1)
-                          then S $ el
-                          else (head (DSET.elems el))
+                       in S $ el
+--          Subtract -> let el = x DSET.\\ y
+--                       in if ((DSET.size el) > 1)
+--                          then S $ el
+--                          else (head (DSET.elems el))
           Intersection -> S $ DSET.intersection x y
           Filter    -> S $ DSET.filter (\n -> if (isSet n)
                                               then let (S v) = n

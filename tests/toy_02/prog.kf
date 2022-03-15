@@ -1,37 +1,29 @@
-colsEnv = set {0, 1, 2};
-dataEnvD = csv("toy_02.txt", colsEnv, 0, "Text");
-envPrior <- dataEnvD;
+def channel(dataset, observable):
+  elOB = set observable;
+  elDT = set dataset;
+  dist = 0;
+  for e in elOB:
+    if (e strIsSub dataset):
+      eSet = (e filterSet elDT);
+      dist <- uniform eSet;
+    else:
+      skip;
+  return dist;
 
-environment <- dataEnvD;
+colsD = set {0, 1};
+dataDD = csv("base.csv", colsD, 0, "Unique Text");
 
-colsSt = set {0};
-dataStD = csv("toy_02.txt", colsSt, 0, "Text");
-strategy <- dataStD;
+datasetM1 <- dataDD;
+colsM1 = set {1};
+dataM1D = csv("base.csv", colsM1, 0, "Text");
+m1 <- dataM1D;
 
-secretVal = set environment;
-secret0Set = "0," filterSet secretVal;
-secret1Set = "1," filterSet secretVal;
-secret0 <- uniform secret0Set;
-secret1 <- uniform secret1Set;
+distM1 = channel(datasetM1, m1);
 
-setV = set { set {"0", secret0} , set {"1", secret1} };
-secret <- mapE strategy setV;
-secret = 0;
-strategyS = set strategy;
-for el in setV:
-   if (strategy in el):
-     secret = el - strategyS;
-   else:
-     skip;
+datasetM2 <- dataDD;
+colsM2 = set {0};
+dataM2D = csv("base.csv", colsM2, 0, "Text");
+m2 <- dataM2D;
 
-colsCh = set {0, 2};
-dataChD = csv("toy_02.txt", colsCh, 0, "Text");
-channel <- dataChD;
+distM2 = channel(datasetM2, m2);
 
-// TO-DO: Implements the equivalent of y.
-setC = set channel;
-y = 0;
-for el in setC:
-  y = el if (el strIsSub secret) else y;
-
-leak(y);
