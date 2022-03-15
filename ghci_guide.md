@@ -3,18 +3,18 @@
 ## Loading modules
 
 To load ghci with the Kuifje compiler loaded, run
-```bash
+```sh
 cabal repl
 ```
 
 The first step is to run ghci, which can be done by:
-```bash
+```sh
 ghci
 ```
 
 Then, we need to directly import some files
 
-```bash
+```haskell
 import Text.PrettyPrint.Boxes
 import Language.Kuifje.Distribution
 import Language.Kuifje.PrettyPrint
@@ -27,7 +27,7 @@ import Language.Kuifje.PrettyPrint
 
 To run the "Monty" example, please, run the follwing commands:
 
-```bash
+```haskell
 hyperOut <- runFile "Examples/Monty.kf" [] (point (E.envFromList [("x", R 0)]))
 printBox . toBox $ hyperOut
 ```
