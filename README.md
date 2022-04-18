@@ -30,7 +30,7 @@ There are some examples under the drectory of `Examples`
 
 A brief example `Examples\BiasCoin.kf`:
 ```c
-p = uniform [0.3, 0.7];
+p <- uniform [0.3, 0.7];
 i = 0;
 while i < 2:
    result = 0 [p] 1;
