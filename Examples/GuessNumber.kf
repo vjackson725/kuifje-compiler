@@ -1,5 +1,5 @@
-sec = uniform [0..10];
-guess = uniform [0..10];
+sec <- uniform [0..10];
+guess <- uniform [0..10];
 L = 0;
 R = 10;
 while guess != sec:

@@ -25,6 +25,9 @@ executable Kuifje-compiler
     Kuifje.PrettyPrint
     Kuifje.Run
     Kuifje.Syntax
+    Kuifje.Expr
+    Kuifje.Stmt
+    Kuifje.LivenessAnalysis
     Kuifje.Translator
     Kuifje.JsonPrint
     Kuifje.CsvLoader

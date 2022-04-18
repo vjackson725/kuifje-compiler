@@ -408,7 +408,7 @@ eOperators =
            Infix  (reservedOp "isSub"  >> return (SBinary IsSubOf)) AssocLeft]
         , [Infix  (reservedOp "&&"  >> return (BBinary And     )) AssocLeft,
            Infix  (reservedOp "||"  >> return (BBinary Or      )) AssocLeft]
-        , [Infix  (kChoice IchoiceDist)                               AssocLeft]
+        , [Infix  (kChoice Ichoice)                               AssocLeft]
         , [Infix  (reservedOp ">"   >> return (RBinary Gt)      ) AssocLeft] 
         , [Infix  (reservedOp "<"   >> return (RBinary Lt)      ) AssocLeft] 
         , [Infix  (reservedOp ">="  >> return (RBinary Ge)      ) AssocLeft] 

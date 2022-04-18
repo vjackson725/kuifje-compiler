@@ -1,5 +1,5 @@
 B = 6;
-E = uniform [0..15];
+E <- uniform [0..15];
 
 b = B;
 e = E;

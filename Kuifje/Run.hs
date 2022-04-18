@@ -1,6 +1,8 @@
 module Kuifje.Run where
 
+import Kuifje.Stmt
 import Kuifje.Translator
+import Kuifje.LivenessAnalysis
 import Kuifje.Parse
 import Kuifje.Value
 import Kuifje.Syntax
