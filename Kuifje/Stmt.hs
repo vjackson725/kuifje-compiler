@@ -257,6 +257,11 @@ updateID fName (Support id expr) = (Support (fName ++ "." ++ id) expr)
 updateID fName (For id expr body) = (For (fName ++ "." ++ id) expr body)
 updateID fName e = e
 
+ichoiceToList :: Expr -> [Expr]
+ichoiceToList (IchoicesDist list) = list
+ichoiceToList (Ichoices list) = list
+ichoiceToList e = error ("Invalid Expresssion: " ++ (show e))
+
 updateExpression :: String -> Expr -> Expr
 updateExpression fName (Var id) = (Var (fName ++ "." ++ id))
 updateExpression fName (Neg r) =
@@ -291,8 +296,8 @@ updateExpression fName (IchoicesDist []) = (Ichoices [])
 updateExpression fName (IchoicesDist ls) =
      let hd = (updateExpression fName (head ls))
          tl = (updateExpression fName (Ichoices (tail ls)))
-         (IchoicesDist list) = tl
-     in (IchoicesDist (hd : list))
+         list = ichoiceToList tl
+      in (IchoicesDist (hd : list))
 updateExpression fName (Tuple e p) =
      let newe = (updateExpression fName e)
      in (Tuple newe p)
