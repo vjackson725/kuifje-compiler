@@ -1,0 +1,16 @@
+def calculateForT(t):
+  ds <- uniform [1 .. 8];
+  i = 0;
+  while (i <= t):
+    leak(ds == i);
+    i = i + 1;
+  return ds;
+
+ts1 = calculateForT(1);
+ts2 = calculateForT(2);
+ts3 = calculateForT(3);
+ts4 = calculateForT(4);
+ts5 = calculateForT(1);
+ts6 = calculateForT(2);
+ts7 = calculateForT(3);
+ts8 = calculateForT(4);
