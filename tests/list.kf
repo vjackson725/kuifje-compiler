@@ -1,0 +1,18 @@
+ls = [4, 3, 2, 1, 2, 3, 4];
+//e3 = ls[2];
+nList = [5, 6];
+
+nList.append(7);
+
+nList.insert(2, 10);
+
+lListExt = nList;
+lListExt.extend(ls);
+
+lRemoved = ls;
+lRemoved.remove(3);
+
+z = len(lRemoved);
+
+x = 3;
+eX = ls[x];

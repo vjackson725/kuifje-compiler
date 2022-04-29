@@ -11,6 +11,7 @@ data Value = R Rational
            | T String
            | PD (DSET.Set (Prob, Value))
            | S (DSET.Set Value) 
+           | LS [Value]
            deriving (Show, Eq, Ord)
 
 type Gamma = E.Env Value 

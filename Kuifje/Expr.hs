@@ -189,11 +189,75 @@ createNewDist v1 v2 p =
        newList = newEl1 ++ newEl2
     in (PD (DSET.fromDistinctAscList newList))
 
+extractFromListTy :: Value -> [Value]
+extractFromListTy (LS list) = list
+extractFromListTy e = error ("The Instruction:\n" ++ (show e) ++ "\n is not accesed by index!")
+
 distFromMapVals :: [(Value, Prob)] -> [(Prob, Value)]
 distFromMapVals [] = []
 distFromMapVals ls = let (v, p) = (head ls)
                          tl = distFromMapVals (tail ls)
                       in (p, v) : tl
+
+recoverElemFromList :: [Value] -> Integer -> Value
+recoverElemFromList [] _ = error ("Element out of index!")
+recoverElemFromList ls id = if (id == 0)
+                            then (head ls)
+                            else (recoverElemFromList (tail ls) (id - 1))
+
+insertElemIntoList :: [Value] -> Value -> Integer -> [Value]
+insertElemIntoList [] el 0 = [el]
+insertElemIntoList [] el _ = error ("Element out of index!")
+insertElemIntoList ls el id = if (id == 0)
+                              then [el] ++ ls
+                              else [(head ls)] ++ (insertElemIntoList (tail ls) el (id - 1)) 
+
+removeElemFromList :: [Value] -> Value -> Bool -> [Value]
+removeElemFromList [] el False = error ((show el) ++ ".remove(x): x not in list")
+removeElemFromList ls el False = let hd = head ls
+                                     tl = tail ls
+                                  in if (hd == el)
+                                     then removeElemFromList tl el True
+                                     else ([hd] ++ (removeElemFromList tl el False))
+removeElemFromList ls _ True = ls
+
+lenghtFromList :: [Value] -> Integer
+lenghtFromList [] = 0
+lenghtFromList ls = (1 + (lenghtFromList (tail ls)))
+
+exprToValue2Cntx :: Expr -> (Dist Value) -> (Dist Value) -> Value
+exprToValue2Cntx (ListExtend id list) ev1 ev2 = 
+  let ls1 = fst (head (assocs (unpackD ev1)))
+      el1 = extractFromListTy ls1
+      ls2 = fst (head (assocs (unpackD ev2)))
+      el2 = extractFromListTy ls2
+      newL = el1 ++ el2
+   in (LS newL)
+exprToValue2Cntx (ListElem id index) ev1 ev2 =
+  let ls = fst (head (assocs (unpackD ev1)))
+      ind = fst (head (assocs (unpackD ev2)))
+      elems = extractFromListTy ls
+   in if (isRational ind)
+      then let (R id) = ind
+            in recoverElemFromList elems (numerator id)
+      else error ("Out of range access index in list: " ++ (show id)) 
+exprToValue2Cntx (ListAppend id elem) ev1 ev2 =
+  let ls = fst (head (assocs (unpackD ev1)))
+      el = fst (head (assocs (unpackD ev2)))
+      elems = extractFromListTy ls
+      newL = elems ++ [el]
+   in (LS newL)
+exprToValue2Cntx (ListInsert id index elem) ev1 ev2 =
+  let ls = fst (head (assocs (unpackD ev1)))
+      el = fst (head (assocs (unpackD ev2)))
+      elems = extractFromListTy ls
+      id = exprToValue index ev1
+   in if (isRational id)
+         then let (R ind) = id
+                  newL = insertElemIntoList elems el (numerator ind)
+               in (LS newL)
+         else error ("Invalid index" ++ (show index))
+
 
 exprToValue :: Expr -> (Dist Value) -> Value
 --exprToValue (Var id) ev = let vals = distFromMapVals (assocs (unpackD ev))
@@ -219,6 +283,30 @@ exprToValue (IchoiceDist e1 e2 p) ev =
        p2 = (1 - r)
        list = [(r, v1), (p2, v2)]
     in (PD (DSET.fromDistinctAscList list))
+exprToValue (ListExpr ls) ev =
+  let l = lExprTolValues ls ev
+   in (LS l)
+exprToValue (ListInsert id index elem) ev =
+  let ls = fst (head (assocs (unpackD ev)))
+      elems = extractFromListTy ls
+      el = exprToValue elem ev
+      id = exprToValue index ev
+   in if (isRational id)
+         then let (R ind) = id
+                  newL = insertElemIntoList elems el (numerator ind)
+               in (LS newL)
+         else error ("Invalid index" ++ (show index))
+exprToValue (ListRemove id elem) ev =
+  let ls = fst (head (assocs (unpackD ev)))
+      elems = extractFromListTy ls
+      el = exprToValue elem ev
+      newL = removeElemFromList elems el False
+   in (LS newL)
+exprToValue (ListLength list) ev =
+  let ls = fst (head (assocs (unpackD ev)))
+      elems = extractFromListTy ls
+      r = lenghtFromList elems
+   in (R (r % 1))
 exprToValue e _ = error ("Invalid exprToValue:\n" ++ (show e))
 
 lExprTolValues :: [Expr] -> (Dist Value) -> [Value]
@@ -458,6 +546,39 @@ evalE (Geometric alpha low start high) =
              sProbs = sum probs
              resultDist = buildDist values probs
          in evalNUList $ INUchoices resultDist
+evalE (ListExpr []) = \s -> return (LS []) 
+evalE (ListExpr list) = \s ->  
+         let els = evalE (ListExpr []) s
+             ls = exprToValue (ListExpr list) els
+          in return ls
+evalE (ListElem id index) = \s -> 
+         let ev1 = evalE (Var id) s
+             ev2 = evalE index s
+             el = exprToValue2Cntx (ListElem id index) ev1 ev2
+          in return el
+evalE (ListAppend id elem) = \s ->
+         let ev1 = evalE (Var id) s
+             ev2 = evalE elem s
+             el = exprToValue2Cntx (ListAppend id elem) ev1 ev2
+          in return el
+evalE (ListInsert id index elem) = \s ->
+         let ev1 = evalE (Var id) s
+             ev2 = evalE elem s
+             el = exprToValue2Cntx (ListInsert id index elem) ev1 ev2
+          in return el
+evalE (ListExtend id1 id2) = \s ->
+         let ev1 = evalE (Var id1) s
+             ev2 = evalE (Var id2) s
+             el = exprToValue2Cntx (ListExtend id1 id2) ev1 ev2
+          in return el
+evalE (ListRemove id elem) = \s ->
+         let elist = evalE (Var id) s
+             el = exprToValue (ListRemove id elem) elist
+          in return el
+evalE (ListLength list) = \s ->
+         let elist = evalE list s
+             el = exprToValue (ListLength list) elist
+          in return el
 
 extractStr :: Expr -> String
 extractStr (Text t) = t

@@ -156,11 +156,12 @@ sTerm :: Parser Stmt
 sTerm = (braces statements
          <|> funcStmt
          <|> returnStmt
-         <|> try callStmt
          <|> try samplingStmt
          <|> try supportStmt
          <|> try readStmt
-         <|> assignStmt
+         <|> try listCallStmt
+         <|> try assignStmt
+         <|> callStmt
          <|> ifStmt
          <|> whileStmt
          <|> forStmt
@@ -319,12 +320,12 @@ forStmt =
      reserved "for"
      var <- identifier
      reservedOp "in"
-     set <- expression
+     list <- expression
      reservedOp ":"
      stmt <- codeBlock ref
      input <- getInput
      setInput (";" ++ input)
-     return $ For var set stmt
+     return $ For var list stmt
 
 assignStmt :: Parser Stmt
 assignStmt =
@@ -381,6 +382,16 @@ readStmt =
      reservedOp ")"
      return $ Csv var file columns limit tVal
 
+listCallStmt :: Parser Stmt
+listCallStmt =
+  do var <- identifier
+     char '.'
+     input <- getInput
+     setInput (var ++ " ls_" ++ input)
+     expr <- expression
+     --error ("Input is " ++ input)
+     return $ Assign var expr
+
 --
 -- Expressions
 --
@@ -426,6 +437,13 @@ eTermR = (parens expression
         <|> (reserved "True"  >> return (BoolConst True ) <?> "true")
         <|> (reserved "False" >> return (BoolConst False) <?> "false")
         <|> setExpr
+        <|> listExpr
+        <|> try listElExpr
+        <|> try listAppend
+        <|> try listInsert
+        <|> try listExtend
+        <|> try listRemove
+        <|> try listLength
         <|> try uniformFromSet
         <|> try uniformIchoices
         <|> try uniformSetVar
@@ -494,11 +512,11 @@ getParam 0 ls = (head ls)
 getParam n ls = getParam (n-1) (tail ls)
 
 geometricIchoices =
-  do reserved "geometric"
-     reservedOp "("
-     params <- sepBy expression (symbol ",")
-     reservedOp ")"
-     return $ Geometric (getParam 0 params) (getParam 1 params) (getParam 2 params) (getParam 3 params)
+        do reserved "geometric"
+           reservedOp "("
+           params <- sepBy expression (symbol ",")
+           reservedOp ")"
+           return $ Geometric (getParam 0 params) (getParam 1 params) (getParam 2 params) (getParam 3 params)
 
 setExpr = 
         do reserved "set"
@@ -507,6 +525,60 @@ setExpr =
            reservedOp "}"
            let values = fromList list
            return $ Eset values
+
+listExpr = 
+        do reservedOp "["
+           elements <- sepBy expression (symbol ",")
+           reservedOp "]"
+           return $ ListExpr elements
+
+listElExpr =
+        do varID <- identifier
+           reservedOp "["
+           varIndex <- expression
+           reservedOp "]"
+           return $ ListElem varID varIndex
+
+listAppend =
+        do var <- identifier
+           reserved "ls_append"
+           reservedOp "("
+           elem <- expression
+           reservedOp ")"
+           return $ ListAppend var elem
+
+listInsert =
+        do var <- identifier
+           reserved "ls_insert"
+           reservedOp "("
+           index <- expression
+           reservedOp ","
+           elem <- expression
+           reservedOp ")"
+           return $ ListInsert var index elem
+
+listRemove =
+        do var <- identifier
+           reserved "ls_remove"
+           reservedOp "("
+           elem <- expression
+           reservedOp ")"
+           return $ ListRemove var elem
+
+listLength =
+        do reserved "len"
+           reservedOp "("
+           list <- expression
+           reservedOp ")"
+           return $ ListLength list
+
+listExtend =
+        do l1 <- identifier
+           reserved "ls_extend"
+           reservedOp "("
+           l2 <- identifier
+           reservedOp ")"
+           return $ ListExtend l1 l2
 
 -- Output only
 parseString :: String -> Stmt

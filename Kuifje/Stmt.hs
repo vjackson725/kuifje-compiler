@@ -190,6 +190,26 @@ recoverVars (RBinary _ e1 e2) ls =
             ls2 = recoverVars e2 ls1
          in ls2
 recoverVars (Eset _) ls = ls
+recoverVars (ListExpr _) ls = ls
+recoverVars (ListElem id _) ls = 
+        let ls1 = recoverVars (Var id) ls
+         in ls1
+recoverVars (ListAppend id _) ls = 
+        let ls1 = recoverVars (Var id) ls
+         in ls1
+recoverVars (ListInsert id _ _) ls =
+        let ls1 = recoverVars (Var id) ls
+         in ls1
+recoverVars (ListRemove id _) ls =
+        let ls1 = recoverVars (Var id) ls
+         in ls1
+recoverVars (ListLength list) ls =
+        let ls1 = recoverVars list ls
+         in ls1
+recoverVars (ListExtend id1 id2) ls =
+        let ls1 = recoverVars (Var id1) ls
+            ls2 = recoverVars (Var id2) ls1
+         in ls2
 recoverVars (SetIchoice e) ls = recoverVars e ls
 recoverVars (SetIchoiceDist e) ls = recoverVars e ls
 recoverVars (Geometric _ _ _ _) ls = ls

@@ -58,6 +58,13 @@ data Expr = Var String
           -- Extension
           | ExprIf Expr Expr Expr
           | Eset (Set Expr)
+          | ListExpr [Expr]
+          | ListElem String Expr
+          | ListAppend String Expr
+          | ListInsert String Expr Expr
+          | ListExtend String String
+          | ListRemove String Expr
+          | ListLength Expr
           | Geometric Expr Expr Expr Expr
           | PowerSet Expr
           deriving (Show, Eq, Ord)

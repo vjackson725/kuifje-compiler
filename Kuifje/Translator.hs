@@ -118,20 +118,19 @@ translateExecKuifje (Kuifje.Syntax.While e body) fBody fCntx list =
             monadList = concatMonadValues list (W e lBody)
          in (monadList, newFBody, newFCntx)
 -- For Statements
-translateExecKuifje (For var (Var idSet) body) fBody fCntx list =
-        -- Check if the set is empty
-        let val = getCntxExpr idSet fCntx
-         in if (isSetNEmpty val)
-            -- Unroll the first element
-            then let (Eset elm) = val
-                     ls = DSET.elems elm
-                     expr = (head ls)
-                     newSet = (Eset (DSET.fromList (tail ls)))
-                     newFCntx = Map.insert var expr fCntx
-                     monadList = concatMonadValues list (A var expr)
-                     (lNext, newFBody2, newFCntx2) = translateExecKuifje body fBody newFCntx monadList
-                  in translateExecKuifje (For var newSet body) newFBody2 newFCntx2 lNext
-            else (translateExecKuifje Kuifje.Syntax.Skip fBody fCntx list)
+translateExecKuifje (For index (Var idList) body) fBody fCntx list = 
+        let iteratorID = "iterator." ++ index
+            listLen = (ListLength (Var idList))
+
+            preCond = concatMonadValues list (A iteratorID (RationalConst (0 % 1)))
+            cond = (RBinary Lt (Var iteratorID) listLen)
+            postCond = (ABinary Add (Var iteratorID) (RationalConst (1 % 1)))
+            
+            element = (ListElem idList (Var iteratorID))
+            toAppend = [(A index element)] ++ [(A iteratorID postCond)]
+            (lBody, newFBody, newFCntx) = translateExecKuifje body fBody fCntx (L toAppend)
+            monadList = concatMonadValues preCond (W cond lBody)
+         in (monadList, newFBody, newFCntx)
 translateExecKuifje (For var set body) fBody fCntx list =
         -- Check if the set is empty
          if (isSetNEmpty set)
