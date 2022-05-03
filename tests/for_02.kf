@@ -1,0 +1,4 @@
+list = ["a", "b", "c"];
+
+for iterator in range(1, 5):
+  list.insert(2, iterator);

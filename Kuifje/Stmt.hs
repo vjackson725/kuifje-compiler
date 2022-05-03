@@ -191,8 +191,12 @@ recoverVars (RBinary _ e1 e2) ls =
          in ls2
 recoverVars (Eset _) ls = ls
 recoverVars (ListExpr _) ls = ls
-recoverVars (ListElem id _) ls = 
+recoverVars (ListElem id index) ls = 
         let ls1 = recoverVars (Var id) ls
+            ls2 = recoverVars index ls1
+         in ls2
+recoverVars (ListElemDirect _ index) ls =
+        let ls1 = recoverVars index ls
          in ls1
 recoverVars (ListAppend id _) ls = 
         let ls1 = recoverVars (Var id) ls

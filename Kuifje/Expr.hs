@@ -233,14 +233,22 @@ exprToValue2Cntx (ListExtend id list) ev1 ev2 =
       el2 = extractFromListTy ls2
       newL = el1 ++ el2
    in (LS newL)
-exprToValue2Cntx (ListElem id index) ev1 ev2 =
+exprToValue2Cntx (ListElem lsid index) ev1 ev2 =
   let ls = fst (head (assocs (unpackD ev1)))
       ind = fst (head (assocs (unpackD ev2)))
       elems = extractFromListTy ls
    in if (isRational ind)
       then let (R id) = ind
             in recoverElemFromList elems (numerator id)
-      else error ("Out of range access index in list: " ++ (show id)) 
+      else error ("Out of range access index in list: " ++ (show lsid)) 
+exprToValue2Cntx (ListElemDirect list index) ev1 ev2 =
+  let ls = fst (head (assocs (unpackD ev1)))
+      ind = fst (head (assocs (unpackD ev2)))
+      elems = extractFromListTy ls
+   in if (isRational ind)
+      then let (R id) = ind
+            in recoverElemFromList elems (numerator id)
+      else error ("Out of range access index in list: " ++ (show list))
 exprToValue2Cntx (ListAppend id elem) ev1 ev2 =
   let ls = fst (head (assocs (unpackD ev1)))
       el = fst (head (assocs (unpackD ev2)))
@@ -555,6 +563,11 @@ evalE (ListElem id index) = \s ->
          let ev1 = evalE (Var id) s
              ev2 = evalE index s
              el = exprToValue2Cntx (ListElem id index) ev1 ev2
+          in return el
+evalE (ListElemDirect list index) = \s ->
+         let ev1 = evalE (ListExpr list) s
+             ev2 = evalE index s
+             el = exprToValue2Cntx (ListElemDirect list index) ev1 ev2
           in return el
 evalE (ListAppend id elem) = \s ->
          let ev1 = evalE (Var id) s

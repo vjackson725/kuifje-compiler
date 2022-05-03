@@ -160,8 +160,8 @@ sTerm = (braces statements
          <|> try supportStmt
          <|> try readStmt
          <|> try listCallStmt
+         <|> try callStmt
          <|> try assignStmt
-         <|> callStmt
          <|> ifStmt
          <|> whileStmt
          <|> forStmt
@@ -444,6 +444,7 @@ eTermR = (parens expression
         <|> try listExtend
         <|> try listRemove
         <|> try listLength
+        <|> try listRange
         <|> try uniformFromSet
         <|> try uniformIchoices
         <|> try uniformSetVar
@@ -495,7 +496,6 @@ uniformIchoicesListComp =
 
 uniformFromSet = 
         do reserved "uniform"
-           reserved "set"
            reservedOp "{"
            list <- sepBy expression (symbol ",")
            reservedOp "}"
@@ -519,8 +519,7 @@ geometricIchoices =
            return $ Geometric (getParam 0 params) (getParam 1 params) (getParam 2 params) (getParam 3 params)
 
 setExpr = 
-        do reserved "set"
-           reservedOp "{"
+        do reservedOp "{"
            list <- sepBy expression (symbol ",")
            reservedOp "}"
            let values = fromList list
@@ -579,6 +578,16 @@ listExtend =
            l2 <- identifier
            reservedOp ")"
            return $ ListExtend l1 l2
+
+listRange =
+        do reserved "range"
+           symbol "("
+           l <- integer
+           symbol ","
+           r <- integer
+           symbol ")"
+           return $ ListExpr [(RationalConst (x % 1)) | x <- [l..r]]
+
 
 -- Output only
 parseString :: String -> Stmt

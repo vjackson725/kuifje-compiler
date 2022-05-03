@@ -1,6 +1,6 @@
-box1 = set {1, 1};
-box2 = set {0, 0};
-box3 = set {0, 1};
+box1 = {1, 1};
+box2 = {0, 0};
+box3 = {0, 1};
 y <- uniform [box1, box2, box3];
 x <- uniform y;
 leak(x);

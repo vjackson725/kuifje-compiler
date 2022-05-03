@@ -65,6 +65,7 @@ data Expr = Var String
           | ListExtend String String
           | ListRemove String Expr
           | ListLength Expr
+          | ListElemDirect [Expr] Expr
           | Geometric Expr Expr Expr Expr
           | PowerSet Expr
           deriving (Show, Eq, Ord)

@@ -1,0 +1,4 @@
+list = [1, 2, 4, 5];
+nList = ["hi", "everyone"];
+for i in list:
+  nList.append(i);
