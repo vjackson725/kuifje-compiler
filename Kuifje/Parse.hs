@@ -160,7 +160,7 @@ sTerm = (braces statements
          <|> try supportStmt
          <|> try readStmt
          <|> try listCallStmt
-         <|> try callStmt
+         -- <|> try callStmt
          <|> try assignStmt
          <|> ifStmt
          <|> whileStmt
@@ -290,7 +290,7 @@ funcStmt =
 returnStmt :: Parser Stmt
 returnStmt =
   do reserved "return"
-     outputs <- sepBy expression (symbol ",")
+     outputs <- expression
      return $ ReturnStmt outputs
      
 callStmt :: Parser Stmt
@@ -301,6 +301,7 @@ callStmt =
      reservedOp "("
      inputs <- sepBy expression (symbol ",")
      reservedOp ")"
+     --error ("Expr is: " ++ name)
      return $ CallStmt name inputs [output]
 
 whileStmt :: Parser Stmt
@@ -445,6 +446,7 @@ eTermR = (parens expression
         <|> try listRemove
         <|> try listLength
         <|> try listRange
+        <|> try callExpr
         <|> try uniformFromSet
         <|> try uniformIchoices
         <|> try uniformSetVar
@@ -588,6 +590,12 @@ listRange =
            symbol ")"
            return $ ListExpr [(RationalConst (x % 1)) | x <- [l..r]]
 
+callExpr =
+        do name <- identifier
+           reservedOp "("
+           parameters <- sepBy expression (symbol ",")
+           reservedOp ")" 
+           return $ CallExpr name parameters
 
 -- Output only
 parseString :: String -> Stmt

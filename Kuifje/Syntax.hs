@@ -58,6 +58,7 @@ data Expr = Var String
           -- Extension
           | ExprIf Expr Expr Expr
           | Eset (Set Expr)
+          | CallExpr String [Expr]
           | ListExpr [Expr]
           | ListElem String Expr
           | ListAppend String Expr
@@ -88,7 +89,7 @@ data Stmt = Seq [Stmt]
           | While Expr Stmt
           | For String Expr Stmt
           | FuncStmt String Stmt [String] --[Expr]
-          | ReturnStmt [Expr]
+          | ReturnStmt Expr
           | CallStmt String [Expr] [String]
           | Support String Expr
           | Csv String Expr Expr Expr Expr

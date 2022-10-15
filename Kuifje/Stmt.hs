@@ -226,9 +226,9 @@ isReturnStmt :: Stmt -> Bool
 isReturnStmt (ReturnStmt _) = True
 isReturnStmt _ = False
 
-getReturnExpr :: Stmt -> [Expr]
+getReturnExpr :: Stmt -> Expr
 getReturnExpr (ReturnStmt expr) = expr
-getReturnExpr _ = []
+getReturnExpr e = error ("Invalid Return Expression " ++ (show e))
 
 findReturns :: [Stmt] -> [Expr]
 -- Skip if no returns were found
@@ -237,7 +237,7 @@ findReturns fBody =
            let hd = (head fBody)
                tl = findReturns (tail fBody) 
            in if (isReturnStmt hd)
-              then (getReturnExpr hd) ++ tl
+              then [(getReturnExpr hd)] ++ tl
               else tl
 
 addInputCntx :: String -> [String] -> [Expr] -> Stmt -> Stmt
@@ -251,16 +251,15 @@ addInputCntx fName fInputs cInputs stmt =
             nStmt = (appendStmtBegin nAssngStmt stmt)
         in (addInputCntx fName (tail fInputs) (tail cInputs) nStmt)
 
-addOutputCntx :: String -> [Expr] -> [String] -> Stmt -> Stmt
+addOutputCntx :: String -> [Expr] -> String -> Stmt -> Stmt
 addOutputCntx fName [] [] stmt = stmt
 addOutputCntx fName [] _  stmt = error ("Invalid Call to " ++ fName)
 addOutputCntx fName _  [] stmt = error ("Invalid Call to " ++ fName)
-addOutputCntx fName fOutputs cOutputs stmt =
-        let id = (head cOutputs)
-            expr = (updateVarToCntx fName (head fOutputs))
-            nAssngStmt = (Assign id expr)
+addOutputCntx fName fOutputs output stmt =
+        let expr = (updateVarToCntx fName (head fOutputs))
+            nAssngStmt = (Assign output expr)
             nStmt = (appendStmtEnd nAssngStmt stmt)
-        in (addOutputCntx fName (tail fOutputs) (tail cOutputs) nStmt)
+        in (addOutputCntx fName (tail fOutputs) (tail output) nStmt)
 
 appendStmtBegin :: Stmt -> Stmt -> Stmt
 appendStmtBegin st1 (Seq ls) = (Seq (st1 : ls))
