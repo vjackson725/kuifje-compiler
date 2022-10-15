@@ -90,7 +90,6 @@ data Stmt = Seq [Stmt]
           | For String Expr Stmt
           | FuncStmt String Stmt [String] --[Expr]
           | ReturnStmt Expr
-          | CallStmt String [Expr] [String]
           | Support String Expr
           | Csv String Expr Expr Expr Expr
           | Skip 

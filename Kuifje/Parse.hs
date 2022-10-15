@@ -160,7 +160,6 @@ sTerm = (braces statements
          <|> try supportStmt
          <|> try readStmt
          <|> try listCallStmt
-         -- <|> try callStmt
          <|> try assignStmt
          <|> ifStmt
          <|> whileStmt
@@ -293,17 +292,6 @@ returnStmt =
      outputs <- expression
      return $ ReturnStmt outputs
      
-callStmt :: Parser Stmt
-callStmt =
-  do output <- identifier
-     reserved "="
-     name <- identifier
-     reservedOp "("
-     inputs <- sepBy expression (symbol ",")
-     reservedOp ")"
-     --error ("Expr is: " ++ name)
-     return $ CallStmt name inputs [output]
-
 whileStmt :: Parser Stmt
 whileStmt =
   do ref <- indentationBlock

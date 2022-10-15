@@ -118,18 +118,6 @@ translateExecKuifje (FuncStmt name body lInput) fBody fCntx list =
 -- Return Statements
 --   Returns were processed by FuncStmt, and should be skiped at this point:
 translateExecKuifje (ReturnStmt outputs) fBody fCntx list = (list, fBody, fCntx)
--- Call Statements
---translateExecKuifje (CallStmt name lInput lOutput) fBody fCntx list =
---        let base = (getFuncBody name fBody)
---            baseStmt = fst3 base
---            fInput = snd3 base
---            fOutput = trd3 base
---            baseUpdated = updateStmtUses name baseStmt
---            outCntxStmt = addOutputCntx name fOutput lOutput baseUpdated
---            inCntxStmt = addInputCntx name fInput lInput outCntxStmt
-         --in error ("Call is:\n" ++ (show inCntxStmt))
---         in translateExecKuifje inCntxStmt fBody fCntx list
--- If statements
 translateExecKuifje (Kuifje.Syntax.If e s1 s2) fBody fCntx list =
         let listTrue = (fst3 (translateExecKuifje s1 fBody fCntx (L [])))
             listFalse = (fst3 (translateExecKuifje s2 fBody fCntx (L [])))
