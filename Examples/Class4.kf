@@ -1,0 +1,22 @@
+// Initialise sequence A.
+A= [];
+list= [0,1,2];
+for n in list:
+  a<- uniform [0, 1];
+  A.append(a);
+N= len(A);
+
+// Search for any occurrence of 0 in A.
+n= 0;
+nn= N;
+zerofrom = {" base case ", N};
+while n<N:
+  a= A[n];
+  if a==0:
+        nn= n;
+  	zerofrom={a," produced ", n};
+  n= n+1;
+b= (nn==N);
+leak(b); // ...whether 0 was there.
+d= 0 filterSet zerofrom; // A way to find the values with 0
+leak(d); // 0 identified

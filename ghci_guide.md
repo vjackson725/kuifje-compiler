@@ -1,5 +1,10 @@
 # A Tutorial to run Kuifje with ghci 
 
+## Automatic script
+```sh
+expect run_ghci_prompt.exp
+```
+
 ## Loading modules
 
 To load ghci with the Kuifje compiler loaded, run
