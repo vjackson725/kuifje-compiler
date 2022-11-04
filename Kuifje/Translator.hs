@@ -95,6 +95,11 @@ translateExecKuifje (Plusplus id) fBody fCntx list =
             one = (RationalConst 1)
             expr = (ABinary Add var one)
          in recoverAsgn expr (Assign id expr) fBody fCntx list
+translateExecKuifje (Lessless id) fBody fCntx list = 
+        let var = (Var id)
+            one = (RationalConst 1)
+            expr = (ABinary Subtract var one)
+         in recoverAsgn expr (Assign id expr) fBody fCntx list
 translateExecKuifje (Support id (Var idexp)) fBody fCntx list = 
         let gammaL = createMonnad list
             kuifje = hysem gammaL (uniform [E.empty])

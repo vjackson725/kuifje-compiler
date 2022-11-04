@@ -85,6 +85,7 @@ data ABinOp = Add
 data Stmt = Seq [Stmt]
           | Assign String Expr
           | Plusplus String
+          | Lessless String
           | Sampling String Expr
           | If Expr Stmt Stmt
           | While Expr Stmt
