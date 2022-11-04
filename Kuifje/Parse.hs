@@ -62,6 +62,7 @@ languageDef =
                                       ]
 
             , Token.reservedOpNames = ["+"
+                                      , "+"
                                       , "-"
                                       , "^"
                                       , "*"
@@ -156,6 +157,7 @@ sTerm :: Parser Stmt
 sTerm = (braces statements
          <|> funcStmt
          <|> returnStmt
+         <|> try plusplusStmt
          <|> try samplingStmt
          <|> try supportStmt
          <|> try readStmt
@@ -322,6 +324,12 @@ assignStmt =
      reservedOp "="
      expr <- expression
      return $ Assign var expr
+
+plusplusStmt :: Parser Stmt
+plusplusStmt =
+  do var  <- identifier
+     reservedOp "++"
+     return $ Plusplus var
 
 samplingStmt :: Parser Stmt
 samplingStmt =

@@ -10,11 +10,13 @@ N= len(A);
 n= 0;
 nn= N;
 zerofrom = {" base case ", N};
+nn2 = 100;
 while n<N:
   a= A[n];
+  nn2 = n if a == 0 else nn2;
   if a==0:
         nn= n;
-  	zerofrom={a," produced ", n};
+  	zerofrom={{"a", a}, {"n", n}};
   n= n+1;
 b= (nn==N);
 leak(b); // ...whether 0 was there.
