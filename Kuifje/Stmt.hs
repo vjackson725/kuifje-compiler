@@ -216,6 +216,7 @@ recoverVars (ListExtend id1 id2) ls =
          in ls2
 recoverVars (SetIchoice e) ls = recoverVars e ls
 recoverVars (SetIchoiceDist e) ls = recoverVars e ls
+recoverVars (TupleExpr _) ls = ls
 recoverVars (Geometric _ _ _ _) ls = ls
 
 isSetNEmpty :: Expr -> Bool

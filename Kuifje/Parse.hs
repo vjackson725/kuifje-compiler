@@ -464,7 +464,7 @@ eTermL :: Parser Expr
 eTermL = ifExpr
 
 eTerm :: Parser Expr
-eTerm = (try eTermL) <|> eTermR
+eTerm = (try eTermL) <|> ((try tupleExpr) <|> eTermR)
 
 ifExpr =
   do exprIf <- eTermR
@@ -528,6 +528,14 @@ setExpr =
            reservedOp "}"
            let values = fromList list
            return $ Eset values
+
+tupleExpr =
+        do reservedOp "("
+           exp <- expression
+           reserved ","
+           list <- sepBy expression (symbol ",")
+           reservedOp ")"
+           return $ TupleExpr ([exp] ++ list)
 
 listExpr = 
         do reservedOp "["

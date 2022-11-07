@@ -315,6 +315,9 @@ exprToValue (ListLength list) ev =
       elems = extractFromListTy ls
       r = lenghtFromList elems
    in (R (r % 1))
+exprToValue (TupleExpr ls) ev =
+  let l = lExprTolValues ls ev
+   in (TP l)
 exprToValue e _ = error ("Invalid exprToValue:\n" ++ (show e))
 
 lExprTolValues :: [Expr] -> (Dist Value) -> [Value]
@@ -592,9 +595,30 @@ evalE (ListLength list) = \s ->
          let elist = evalE list s
              el = exprToValue (ListLength list) elist
           in return el
-
-extractStr :: Expr -> String
-extractStr (Text t) = t
+--evalE (TupleExpr []) = \s -> return (TP []) 
+--evalE (TupleExpr list) = \s ->
+--         let hd = evalE (head list) s
+--             tl = evalE (TupleExpr (tail list)) s
+--          in D $ fromListWith (+) resultList
+evalE (TupleExpr list) = \s -> 
+        let runAll e = toList (runD ((evalE e) s))
+            distList = Data.List.map runAll list
+            tmpDistToVal :: [(Value, Prob)] -> [Value]
+            tmpDistToVal [] = []
+            tmpDistToVal ls =
+                         let hd = head ls
+                             (a, _) = hd
+                             tl = tmpDistToVal (tail ls)
+                          in [a] ++ tl
+            valList = Data.List.map tmpDistToVal distList
+            to1DList :: [[Value]] -> [Value]
+            to1DList [] = []
+            to1DList ls =
+                     let hd = head ls
+                         tl = to1DList (tail ls)
+                      in hd ++ tl
+            linearList = to1DList valList
+         in return (TP linearList)
 
 buildDist :: [Integer] -> [Rational] -> [Expr]
 buildDist [] [] = []

@@ -56,6 +56,7 @@ data Expr = Var String
           | SBinary SBinOp Expr Expr
 
           -- Extension
+          | TupleExpr [Expr] 
           | ExprIf Expr Expr Expr
           | Eset (Set Expr)
           | CallExpr String [Expr]
