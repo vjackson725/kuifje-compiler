@@ -60,6 +60,22 @@ recoverListID :: Expr -> Expr -> Expr
 recoverListID (Var idList) index = (ListElem idList index)
 recoverListID (ListExpr list) index = (ListElemDirect list index)
 
+recoverAsgn :: Expr -> Stmt ->  Map.Map String (Stmt, [String], [Expr]) -> Map.Map String Expr -> MonadValue -> (MonadValue, Map.Map String (Stmt, [String], [Expr]), Map.Map String Expr)
+recoverAsgn (CallExpr name params) (Assign id expr) fBody fCntx list =
+        let base = (getFuncBody name fBody)
+            baseStmt = fst3 base
+            fInput = snd3 base
+            fOutput = trd3 base
+            baseUpdated = updateStmtUses name baseStmt
+            outCntxStmt = addOutputCntx name fOutput id baseUpdated
+            inCntxStmt = addInputCntx name fInput params outCntxStmt
+         --in error ("Call is:\n" ++ (show inCntxStmt))
+         in translateExecKuifje inCntxStmt fBody fCntx list
+recoverAsgn _ (Assign id expr) fBody fCntx list =
+        let newFCntx = Map.insert id expr fCntx
+            monadList = concatMonadValues list (A id expr)
+         in (monadList, fBody, newFCntx)
+
 translateExecKuifje :: Stmt -> Map.Map String (Stmt, [String], [Expr]) -> Map.Map String Expr -> MonadValue -> (MonadValue, Map.Map String (Stmt, [String], [Expr]), Map.Map String Expr)
 -- Sequence Statements
 translateExecKuifje (Seq []) fBody fCntx list = (list, fBody, fCntx)
@@ -68,11 +84,22 @@ translateExecKuifje (Seq ls) fBody fCntx list =
             (tlRes, tlFBody, tlFCntx) = (translateExecKuifje (Seq (tail ls)) hdFBody hdFCntx hdRes)
          in (translateExecKuifje (Seq (tail ls)) hdFBody hdFCntx hdRes)
 -- Assign Statements
-translateExecKuifje (Assign id expr) fBody fCntx list = 
-        let newFCntx = Map.insert id expr fCntx
-            monadList = concatMonadValues list (A id expr)
-         in (monadList, fBody, newFCntx)
+translateExecKuifje (Assign id expr) fBody fCntx list = recoverAsgn expr (Assign id expr) fBody fCntx list
+--translateExecKuifje (Assign id expr) fBody fCntx list = 
+--        let newFCntx = Map.insert id expr fCntx
+--            monadList = concatMonadValues list (A id expr)
+--         in (monadList, fBody, newFCntx)
 -- Support Statements
+translateExecKuifje (Plusplus id) fBody fCntx list = 
+        let var = (Var id)
+            one = (RationalConst 1)
+            expr = (ABinary Add var one)
+         in recoverAsgn expr (Assign id expr) fBody fCntx list
+translateExecKuifje (Lessless id) fBody fCntx list = 
+        let var = (Var id)
+            one = (RationalConst 1)
+            expr = (ABinary Subtract var one)
+         in recoverAsgn expr (Assign id expr) fBody fCntx list
 translateExecKuifje (Support id (Var idexp)) fBody fCntx list = 
         let gammaL = createMonnad list
             kuifje = hysem gammaL (uniform [E.empty])
@@ -101,18 +128,6 @@ translateExecKuifje (FuncStmt name body lInput) fBody fCntx list =
 -- Return Statements
 --   Returns were processed by FuncStmt, and should be skiped at this point:
 translateExecKuifje (ReturnStmt outputs) fBody fCntx list = (list, fBody, fCntx)
--- Call Statements
-translateExecKuifje (CallStmt name lInput lOutput) fBody fCntx list =
-        let base = (getFuncBody name fBody)
-            baseStmt = fst3 base
-            fInput = snd3 base
-            fOutput = trd3 base
-            baseUpdated = updateStmtUses name baseStmt
-            outCntxStmt = addOutputCntx name fOutput lOutput baseUpdated
-            inCntxStmt = addInputCntx name fInput lInput outCntxStmt
-         --in error ("Call is:\n" ++ (show inCntxStmt))
-         in translateExecKuifje inCntxStmt fBody fCntx list
--- If statements
 translateExecKuifje (Kuifje.Syntax.If e s1 s2) fBody fCntx list =
         let listTrue = (fst3 (translateExecKuifje s1 fBody fCntx (L [])))
             listFalse = (fst3 (translateExecKuifje s2 fBody fCntx (L [])))

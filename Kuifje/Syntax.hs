@@ -56,8 +56,10 @@ data Expr = Var String
           | SBinary SBinOp Expr Expr
 
           -- Extension
+          | TupleExpr [Expr] 
           | ExprIf Expr Expr Expr
           | Eset (Set Expr)
+          | CallExpr String [Expr]
           | ListExpr [Expr]
           | ListElem String Expr
           | ListAppend String Expr
@@ -83,13 +85,14 @@ data ABinOp = Add
 
 data Stmt = Seq [Stmt]
           | Assign String Expr
+          | Plusplus String
+          | Lessless String
           | Sampling String Expr
           | If Expr Stmt Stmt
           | While Expr Stmt
           | For String Expr Stmt
           | FuncStmt String Stmt [String] --[Expr]
-          | ReturnStmt [Expr]
-          | CallStmt String [Expr] [String]
+          | ReturnStmt Expr
           | Support String Expr
           | Csv String Expr Expr Expr Expr
           | Skip 

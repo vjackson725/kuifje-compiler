@@ -156,11 +156,12 @@ sTerm :: Parser Stmt
 sTerm = (braces statements
          <|> funcStmt
          <|> returnStmt
+         <|> try plusplusStmt
+         <|> try lesslessStmt
          <|> try samplingStmt
          <|> try supportStmt
          <|> try readStmt
          <|> try listCallStmt
-         <|> try callStmt
          <|> try assignStmt
          <|> ifStmt
          <|> whileStmt
@@ -290,19 +291,9 @@ funcStmt =
 returnStmt :: Parser Stmt
 returnStmt =
   do reserved "return"
-     outputs <- sepBy expression (symbol ",")
+     outputs <- expression
      return $ ReturnStmt outputs
      
-callStmt :: Parser Stmt
-callStmt =
-  do output <- identifier
-     reserved "="
-     name <- identifier
-     reservedOp "("
-     inputs <- sepBy expression (symbol ",")
-     reservedOp ")"
-     return $ CallStmt name inputs [output]
-
 whileStmt :: Parser Stmt
 whileStmt =
   do ref <- indentationBlock
@@ -333,6 +324,18 @@ assignStmt =
      reservedOp "="
      expr <- expression
      return $ Assign var expr
+
+plusplusStmt :: Parser Stmt
+plusplusStmt =
+  do var  <- identifier
+     reservedOp "++"
+     return $ Plusplus var
+
+lesslessStmt :: Parser Stmt
+lesslessStmt =
+  do var  <- identifier
+     reservedOp "--"
+     return $ Lessless var
 
 samplingStmt :: Parser Stmt
 samplingStmt =
@@ -445,6 +448,7 @@ eTermR = (parens expression
         <|> try listRemove
         <|> try listLength
         <|> try listRange
+        <|> try callExpr
         <|> try uniformFromSet
         <|> try uniformIchoices
         <|> try uniformSetVar
@@ -460,7 +464,7 @@ eTermL :: Parser Expr
 eTermL = ifExpr
 
 eTerm :: Parser Expr
-eTerm = (try eTermL) <|> eTermR
+eTerm = (try eTermL) <|> ((try tupleExpr) <|> eTermR)
 
 ifExpr =
   do exprIf <- eTermR
@@ -525,6 +529,14 @@ setExpr =
            let values = fromList list
            return $ Eset values
 
+tupleExpr =
+        do reservedOp "("
+           exp <- expression
+           reserved ","
+           list <- sepBy expression (symbol ",")
+           reservedOp ")"
+           return $ TupleExpr ([exp] ++ list)
+
 listExpr = 
         do reservedOp "["
            elements <- sepBy expression (symbol ",")
@@ -588,6 +600,12 @@ listRange =
            symbol ")"
            return $ ListExpr [(RationalConst (x % 1)) | x <- [l..r]]
 
+callExpr =
+        do name <- identifier
+           reservedOp "("
+           parameters <- sepBy expression (symbol ",")
+           reservedOp ")" 
+           return $ CallExpr name parameters
 
 -- Output only
 parseString :: String -> Stmt

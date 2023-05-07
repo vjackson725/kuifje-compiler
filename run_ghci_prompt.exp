@@ -1,0 +1,19 @@
+#!/usr/bin/expect
+
+spawn cabal repl
+expect "*Kuifje.Env> "
+
+send "import Text.PrettyPrint.Boxes\n"
+expect "*Kuifje.Env Text.PrettyPrint.Boxes> "
+
+send "import Language.Kuifje.Distribution\n"
+expect "*Kuifje.Env Text.PrettyPrint.Boxes Language.Kuifje.Distribution> "
+
+send "import Language.Kuifje.PrettyPrint\n"
+expect "*Kuifje.Env Text.PrettyPrint.Boxes Language.Kuifje.Distribution Language.Kuifje.PrettyPrint> "
+
+send ":l Kuifje.Env\n"
+send ":l Kuifje.Value\n"
+send ":l Kuifje.Run\n"
+
+interact
