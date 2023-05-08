@@ -422,7 +422,7 @@ sampleFromDist (SetIchoice e) = let newE = sampleFromDist e
                                  in (SetIchoice newE)
 sampleFromDist (SetIchoiceDist e) = let newE = sampleFromDist e
                                      in (SetIchoice newE)
-sampleFromDist (ListExpr ls) = (convertTupleListToExpr ls)
+sampleFromDist (ListExpr ls) = (INUchoices ls)
 --sampleFromDist (ListExpr ls) = let newLs = convertTupleListToExpr ls
 --                                in error ("List is: " ++ show (newLs))
 sampleFromDist e = error("Error: " ++ show(e))
