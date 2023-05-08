@@ -356,7 +356,8 @@ convertDistListToExprList ls = let (p, v) = head ls
 
 convertTupleListToExpr :: [Expr] -> Expr
 convertTupleListToExpr ls = if (length ls) == 1
-                            then (head ls)
+                            then let (Tuple eHead _) = (head ls)
+                                  in eHead
                             else let (Tuple eHead p) = (head ls)
                                      eTail = convertTupleListToExpr (tail ls)
                                   in (Ichoice eHead eTail p)
@@ -421,6 +422,18 @@ sampleFromDist (SetIchoice e) = let newE = sampleFromDist e
                                  in (SetIchoice newE)
 sampleFromDist (SetIchoiceDist e) = let newE = sampleFromDist e
                                      in (SetIchoice newE)
+sampleFromDist (ListExpr ls) = (convertTupleListToExpr ls)
+--sampleFromDist (ListExpr ls) = let newLs = convertTupleListToExpr ls
+--                                in error ("List is: " ++ show (newLs))
+sampleFromDist e = error("Error: " ++ show(e))
+
+isTuple :: Expr -> Bool
+isTuple (Tuple _ _) = True
+isTuple _ = False
+
+isTupleList :: [Expr] -> Bool
+isTupleList [] = False
+isTupleList ls = isTuple (head ls)
 
 evalE :: Expr -> (Gamma ~> Value)
 evalE (Var id) = \s -> case E.lookup s id of 
@@ -560,8 +573,10 @@ evalE (Geometric alpha low start high) =
 evalE (ListExpr []) = \s -> return (LS []) 
 evalE (ListExpr list) = \s ->  
          let els = evalE (ListExpr []) s
-             ls = exprToValue (ListExpr list) els
-          in return ls
+          in if (isTupleList list) == True
+             then evalE (INUchoices list) s
+             else let ls = exprToValue (ListExpr list) els
+                  in return ls
 evalE (ListElem id index) = \s -> 
          let ev1 = evalE (Var id) s
              ev2 = evalE index s
