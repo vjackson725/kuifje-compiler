@@ -574,7 +574,7 @@ evalE (ListExpr []) = \s -> return (LS [])
 evalE (ListExpr list) = \s ->  
          let els = evalE (ListExpr []) s
           in if (isTupleList list) == True
-             then evalE (INUchoices list) s
+             then evalE (INUchoicesDist list) s
              else let ls = exprToValue (ListExpr list) els
                   in return ls
 evalE (ListElem id index) = \s -> 
