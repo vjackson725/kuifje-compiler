@@ -1,0 +1,14 @@
+stash <- uniform[0..7];
+leak(stash == 1);
+leak(stash == 2);
+leak(stash == 3);
+if (stash != 1):
+     if (stash != 2):
+          if (stash != 3):
+              stash <- uniform[0..7];
+          else:
+              skip;
+     else:
+          skip;
+else:
+    skip;

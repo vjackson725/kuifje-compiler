@@ -122,12 +122,12 @@ createMonnad (W e body) =
 createMonnad (C e s1 s2) =
         Language.Kuifje.Syntax.cond 
           (\s -> let currS = (evalE e) s in fmap (\r -> case r of (B b) -> b) currS) 
-          -- (createMonnad s1)
-          -- (createMonnad s2)
+          (createMonnad s1)
+          (createMonnad s2)
           --
           -- Leaks the conditional after choose an option
-          ((createMonnad s1) <> (observe (evalE e))) 
-          ((createMonnad s2) <> (observe (evalE e)))
+          --((createMonnad s1) <> (observe (evalE e))) 
+          --((createMonnad s2) <> (observe (evalE e)))
 createMonnad (E s1 s2 p) =
         Language.Kuifje.Syntax.cond
           (\s -> let p' = (evalE (Ichoice (BoolConst True) (BoolConst False) p) s)

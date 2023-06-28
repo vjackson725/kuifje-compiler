@@ -1,0 +1,6 @@
+stash <- uniform[0..7];
+if (stash != 1) && (stash != 2) && (stash != 3):
+  stash <- uniform[0..7];
+leak(stash == 1);
+leak(stash == 2);
+leak(stash == 3);
