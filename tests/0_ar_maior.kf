@@ -4,8 +4,6 @@ leak(stash == 1);
 leak(stash == 2);
 leak(stash == 3);
 if (stash != 1):
-    stash <- tmp;
-if (stash != 2):
-    stash <- tmp;     
-if (stash != 3):
-    stash <- tmp;
+  if (stash != 2):
+    if (stash != 3):
+      stash <- tmp;
