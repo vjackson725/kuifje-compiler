@@ -88,7 +88,7 @@ runFile filename param distrib =
     let v = runLivenessAnalysis ast
     let monadAst = createMonnad ast
     if v then 
-      do return (hysem monadAst distrib)
+      return (hysem monadAst distrib)
     else error ("\n\nCompilation fatal error.\n\n")
 
 runFileDefaultParams :: String -> [String] -> IO ()
