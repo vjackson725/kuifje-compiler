@@ -100,7 +100,7 @@ bindDist :: (Ord b) => Dist a -> (a -> Dist b) -> Dist b
 bindDist d f = probListToDist $ (>>=) (distToProbList d) (distToProbList . f)
 
 -- | Top-level join function for distributions.
-joinDist :: (Ord a) => Hyper a -> Dist a
+joinDist :: (Ord a) => Dist (Dist a) -> Dist a
 joinDist x = bindDist x id
 
 -- | fmap function for distributions.

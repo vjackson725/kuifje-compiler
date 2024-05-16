@@ -6,10 +6,18 @@
 
 module Language.Kuifje.Semantics where
 
+import Data.Bifunctor (second)
+import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 
 import Language.Kuifje.Distribution
 import Language.Kuifje.Syntax
+
+
+-- | Duplicate. The 'diagonal' function.
+dup :: a -> (a,a)
+dup a = (a,a)
+
 
 -- | Hyper-distribution type synonym.
 type a ~~> b = Dist a -> Hyper b
@@ -34,25 +42,31 @@ hysem (Observe f p) = hobsem f ==> hysem p
 
 -- | Conditional semantics ('If' and 'While').
 conditional :: forall s. (Ord s) => (s ~> Bool) -> (s ~~> s) -> (s ~~> s) -> (s ~~> s)
-conditional ec pt pf = \d ->
-  let d' :: Dist (Bool, s)
-      d' = probListToDist $ do
-                              s <- distToProbList . reduction $ d
-                              b <- distToProbList . reduction . ec $ s
-                              return (b, s)
-      w1 = weight . probListToDist . filterProbList fst . distToProbList $ d'
-      w2 = 1 - w1
-      d1 = D $ M.fromListWith (+) [(s, p / w1) | ((b, s), p) <- M.toList $ runD d', b]
-      d2 = D $ M.fromListWith (+) [(s, p / w2) | ((b, s), p) <- M.toList $ runD d', not b]
-      h1 = pt d1
-      h2 = pf d2
-   in if      null (runD d2) then h1
-      else if null (runD d1) then h2
-                             else joinDist (choose w1 h1 h2)
+conditional ec ct cf = \ds ->
+  let h :: Map (Bool, Dist s) Prob
+      h = runD . hobsemRet ec . reduction $ ds
+      hh :: Dist (Hyper s)
+      hh = D . M.mapKeys (\(b,d) -> if b then ct d else cf d) $ h
+   in joinDist hh
 
 -- | Lifts a distribution to a hyper-distribution.
 huplift :: (Ord s) => (s ~> s) -> (s ~~> s)
 huplift f = returnDist . (=>> f)
+
+-- | 'Observe' semantics with conditioned hyperset.
+--    Assumes d is reduced.
+hobsemRet :: forall s o. (Ord s, Ord o) => (s ~> o) -> (Dist s ~> (o, Dist s))
+hobsemRet f = \d -> gatherObs $ bindDist d (obsem f)
+  where
+    obsem :: forall a. (Ord a) => (a ~> o) -> a ~> (o, a)
+    obsem f' x = fmapDist (,x) (f' x)
+
+    gatherObs :: Dist (o, s) -> Dist (o, Dist s)
+    gatherObs dp = fmapDist (second f' . dup . fst) dp
+      where
+        f' :: o -> Dist s
+        f' ws = let dpws = D . M.mapKeys snd . M.filterWithKey (\(ws',_) -> const (ws == ws')) . runD $ dp
+                in D . M.map (/ weight dpws) . runD $ dpws
 
 -- | 'Observe' semantics.
 hobsem :: forall s o. (Ord s, Ord o) => (s ~> o) -> (s ~~> s)
