@@ -95,6 +95,15 @@ bindDist d f = probListToDist $ (>>=) (distToProbList d) (distToProbList . f)
 joinDist :: (Ord a) => Hyper a -> Dist a
 joinDist x = bindDist x id
 
+-- | fmap function for distributions.
+sequenceDist :: (Traversable t, Ord (t a)) => t (Dist a) -> Dist (t a)
+sequenceDist = probListToDist . sequenceA . fmap distToProbList
+
+-- | fmap function for distributions.
+traverseDist :: (Traversable t, Ord (t b)) => (a -> Dist b) -> t a -> Dist (t b)
+traverseDist f = probListToDist . traverse (distToProbList . f)
+
+
 -- | Construct a discrete distribution from a nonempty list of elements,
 -- assigning the same probability to each element.
 uniform :: (Ord a) => [a] -> Dist a
