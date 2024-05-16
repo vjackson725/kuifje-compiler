@@ -31,22 +31,6 @@ import Text.ParserCombinators.Parsec.Expr
 (*^*) :: (RealFrac a, RealFrac b) => a -> b -> a
 x *^* y = realToFrac $ realToFrac x ** realToFrac y
 
-isText :: Value -> Bool
-isText (T _) = True
-isText _ = False
-
-isSet :: Value -> Bool
-isSet (S _) = True
-isSet _ = False
-
-isBool :: Value -> Bool
-isBool (B _) = True
-isBool _ = False
-
-isRational :: Value -> Bool
-isRational (R _) = True
-isRational _ = False
-
 aOperatorWarpper op (R x) (R y) = 
         case op of 
           Add      -> R $ (+) x y

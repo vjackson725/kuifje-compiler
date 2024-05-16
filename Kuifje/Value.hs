@@ -22,5 +22,34 @@ data Value = R Rational
            | TP [Value]
            deriving (Show, Eq, Ord)
 
+isText :: Value -> Bool
+isText (T _) = True
+isText _ = False
+
+isSet :: Value -> Bool
+isSet (S _) = True
+isSet _ = False
+
+isBool :: Value -> Bool
+isBool (B _) = True
+isBool _ = False
+
+isRational :: Value -> Bool
+isRational (R _) = True
+isRational _ = False
+
+theText :: Value -> String
+theText (T s) = s
+
+theSet :: Value -> DSET.Set Value
+theSet (S s) = s
+
+theBool :: Value -> Bool
+theBool (B b) = b
+
+theRational :: Value -> Rational
+theRational (R x) = x
+
+-- | Environment / Program state
 type Gamma = E.Env Value 
 
