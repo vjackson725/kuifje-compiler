@@ -115,13 +115,12 @@ createMonnad (A id expr) =
 createMonnad (L []) = skip
 createMonnad (L ls) = createMonnad (head ls) <> createMonnad (L (tail ls))
 createMonnad (W e body) =
-        Language.Kuifje.Syntax.while (\s -> 
-                let currS = (evalE e) s
-                 in fmapDist (\r -> case r of (B b) -> b) currS) (createMonnad body)
+        Language.Kuifje.Syntax.while
+            (fmapDist theBool . evalE e)
+            (createMonnad body)
 createMonnad (C e s1 s2) =
         Language.Kuifje.Syntax.cond 
-          (\s -> let currS = (evalE e) s
-                  in fmapDist (\r -> case r of (B b) -> b) currS) 
+          (fmapDist theBool . evalE e)
           ((observe (evalE e)) <> (createMonnad s1))
           ((observe (evalE e)) <> (createMonnad s2))
           --
@@ -131,7 +130,7 @@ createMonnad (C e s1 s2) =
 createMonnad (E s1 s2 p) =
         Language.Kuifje.Syntax.cond
           (\s -> let p' = (evalE (Ichoice (BoolConst True) (BoolConst False) p) s)
-                  in fmapDist (\r -> case r of (B b) -> b) p')
+                  in fmapDist theBool p')
           (createMonnad s1)
           (createMonnad s2)
 
