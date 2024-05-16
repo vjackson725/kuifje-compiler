@@ -2,6 +2,7 @@
 
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE GADTs #-}
 
 module Language.Kuifje.Syntax where
 
@@ -11,12 +12,19 @@ import Language.Kuifje.Distribution
 type a ~> b = a -> Dist b
 
 -- | Syntax of the Kuifje language.
-data Kuifje s
-  = Skip
-  | Update (s ~> s) (Kuifje s)
-  | If (s ~> Bool) (Kuifje s) (Kuifje s) (Kuifje s)
-  | While (s ~> Bool) (Kuifje s) (Kuifje s)
-  | forall o. (Ord o) => Observe (s ~> o) (Kuifje s)
+data Kuifje s where
+  Skip :: Kuifje s
+  Update :: (s ~> s) -> Kuifje s -> Kuifje s
+  If :: (s ~> Bool) -> Kuifje s -> Kuifje s -> Kuifje s -> Kuifje s
+  While :: (s ~> Bool) -> Kuifje s -> Kuifje s -> Kuifje s
+  Observe :: Ord o => (s ~> o) -> Kuifje s -> Kuifje s
+
+instance Show s => Show (Kuifje s) where
+  show Skip = "Skip"
+  show (Update _ k) = "Update <fun>; " ++ show k
+  show (If _ astt astf k) = "If <test> (" ++ show astt ++ ") (" ++ show astf ++ ") Fi; " ++ show k
+  show (While _ ast k) = "While <test> (" ++ show ast ++ ") Done; " ++ show k
+  show (Observe _ k) = "Observe <fun>; " ++ show k
 
 instance Semigroup (Kuifje s) where
   Skip        <> k = k
