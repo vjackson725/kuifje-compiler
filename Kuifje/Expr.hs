@@ -451,15 +451,9 @@ evalE (Ichoice e1 e2 p) = \s ->
       d1 = D $ Data.Map.Strict.map (*p') $ runD e1'
       d2 = D $ Data.Map.Strict.map (*(1-p')) $ runD e2'
    in D $ unionWith (+) (runD d1) (runD d2)
-evalE (IchoiceDist e1 e2 p) = \s -> 
-  let v1' = (evalE e1) s
-      v2' = (evalE e2) s
-      p' = (evalE p) s
-      v1 = exprToValue e1 v1'
-      v2 = exprToValue e2 v2'
-      (R r) = exprToValue p p'
-      dist = createNewDist v1 v2 r
-   in returnDist dist
+evalE (IchoiceDist e1 e2 p) = \s ->
+  let dw = fmapDist theRational $ evalE p s
+   in bindDist dw (joinDist . bernoulli (evalE e1 s) (evalE e2 s))
 evalE (Ichoices ls) = 
    if length ls == 1 
       then evalE $ head ls
