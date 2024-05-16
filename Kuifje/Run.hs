@@ -87,7 +87,7 @@ runFile filename param distrib =
     ast <- compileFile filename param
     let v = runLivenessAnalysis ast
     let monadAst = createMonnad ast
-    if v then 
+    if v then
       return (hysem monadAst distrib)
     else error ("\n\nCompilation fatal error.\n\n")
 
