@@ -4,7 +4,6 @@
 
 module Language.Kuifje.Semantics where
 
-import Prelude hiding (return, fmap, (>>=))
 import Data.Map.Strict (fromListWith, toList, elems, mapWithKey)
 
 import Language.Kuifje.Distribution

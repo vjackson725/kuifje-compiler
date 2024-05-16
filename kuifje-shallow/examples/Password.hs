@@ -2,7 +2,6 @@
 
 module Password where
 
-import Prelude hiding ((!!), return, fmap)
 import Control.Lens hiding (Profunctor, dimap)
 import Data.List ((\\),genericIndex,permutations,sortBy)
 import Data.Semigroup
