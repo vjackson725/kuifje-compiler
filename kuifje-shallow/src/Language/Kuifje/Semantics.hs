@@ -1,10 +1,12 @@
 {-# OPTIONS_GHC -Wall #-}
 
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Language.Kuifje.Semantics where
 
-import Data.Map.Strict (fromListWith, toList, elems, mapWithKey)
+import qualified Data.Map.Strict as M
 
 import Language.Kuifje.Distribution
 import Language.Kuifje.Syntax
@@ -31,44 +33,50 @@ hysem (While c p q) = let wh = conditional c (hysem p ==> wh) (hysem q)
 hysem (Observe f p) = hobsem f ==> hysem p
 
 -- | Conditional semantics ('If' and 'While').
-conditional :: (Ord s) => (s ~> Bool) -> (s ~~> s) -> (s ~~> s) -> (s ~~> s)
-conditional c t e d
-  = let d' = d =>> \s -> c s =>> \b -> returnDist (b, s)
-        w1 = sum [p | ((b, _), p) <- toList $ runD d', b]
-        w2 = 1 - w1
-        d1 = D $ fromListWith (+) [(s, p / w1) | ((b, s), p) <- toList $ runD d', b]
-        d2 = D $ fromListWith (+) [(s, p / w2) | ((b, s), p) <- toList $ runD d', not b]
-        h1 = t d1
-        h2 = e d2
-    in  if      null (runD d2) then h1
-        else if null (runD d1) then h2
-                               else joinDist (choose w1 h1 h2)
+conditional :: forall s. (Ord s) => (s ~> Bool) -> (s ~~> s) -> (s ~~> s) -> (s ~~> s)
+conditional ec pt pf = \d ->
+  let d' :: Dist (Bool, s)
+      d' = probListToDist $ do
+                              s <- distToProbList . reduction $ d
+                              b <- distToProbList . reduction . ec $ s
+                              return (b, s)
+      w1 = weight . probListToDist . filterProbList fst . distToProbList $ d'
+      w2 = 1 - w1
+      d1 = D $ M.fromListWith (+) [(s, p / w1) | ((b, s), p) <- M.toList $ runD d', b]
+      d2 = D $ M.fromListWith (+) [(s, p / w2) | ((b, s), p) <- M.toList $ runD d', not b]
+      h1 = pt d1
+      h2 = pf d2
+   in if      null (runD d2) then h1
+      else if null (runD d1) then h2
+                             else joinDist (choose w1 h1 h2)
 
 -- | Lifts a distribution to a hyper-distribution.
 huplift :: (Ord s) => (s ~> s) -> (s ~~> s)
 huplift f = returnDist . (=>> f)
 
 -- | 'Observe' semantics.
-hobsem :: (Ord s, Ord o) => (s ~> o) -> (s ~~> s)
+hobsem :: forall s o. (Ord s, Ord o) => (s ~> o) -> (s ~~> s)
 hobsem f = multiply . toPair . (=>> obsem f)
   where
+    obsem :: forall a. (Ord a) => (a ~> o) -> a ~> (o, a)
+    obsem f' x = fmapDist (,x) (f' x)
 
-    obsem :: (Ord o, Ord a) => (a ~> o) -> a ~> (o,a)
-    obsem f' x = fmapDist (\w -> (w, x)) (f' x)
-
-    toPair :: (Ord s, Ord o) => Dist (o, s) -> (Dist o, o -> Dist s)
+    toPair :: Dist (o, s) -> (Dist o, o -> Dist s)
     toPair dp = (d, f')
       where
-        d     = fmapDist fst dp
-        f' ws = let dpws = D $ fromListWith (+) [(s, p) | ((ws', s), p) <- toList $ runD dp, ws' == ws]
-                in D $ fromListWith (+) [(s, p / weight dpws) | (s, p) <- toList $ runD dpws]
+        d :: Dist o
+        d = fmapDist fst dp
 
-    multiply :: (Ord s) => (Dist o, o -> Dist s) -> Hyper s
+        f' :: o -> Dist s
+        f' ws = let dpws = D . M.mapKeys snd . M.filterWithKey (\(ws',_) _ -> ws == ws') . runD $ dp
+                in D . M.map (/ weight dpws) . runD $ dpws
+
+    multiply :: (Dist o, o -> Dist s) -> Hyper s
     multiply (d, f') = fmapDist f' d
 
 -- | Calculate Bayes Vulnerability for a distribution.
 bayesVuln :: Ord a => Dist a -> Prob
-bayesVuln = maximum . elems . runD . reduction
+bayesVuln = maximum . M.elems . runD . reduction
 
 -- | Based on an entropy function for distributions, calculate the
 -- average entropy for a hyper-distribution.
@@ -77,4 +85,4 @@ condEntropy e m = average (fmapDist e m)
 
 -- | Average a distribution of Rationals.
 average :: Dist Rational -> Rational
-average = sum . mapWithKey (*) . runD
+average = sum . M.mapWithKey (*) . runD

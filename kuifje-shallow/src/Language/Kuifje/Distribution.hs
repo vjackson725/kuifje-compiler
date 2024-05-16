@@ -2,6 +2,7 @@
 
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE InstanceSigs #-}
 
 module Language.Kuifje.Distribution where
 
@@ -35,6 +36,13 @@ instance Monad ProbList where
         (x,p) <- unProbList xs
         (y,q) <- unProbList $ f x
         return (y, p * q))
+
+instance Foldable ProbList where
+  foldr :: (a -> b -> b) -> b -> ProbList a -> b
+  foldr f b (ProbList xs) = foldr (f . fst) b xs
+
+filterProbList :: (a -> Bool) -> ProbList a -> ProbList a
+filterProbList p (ProbList xs) = ProbList (filter (p . fst) xs)
 
 
 -- | Distribution data type.
