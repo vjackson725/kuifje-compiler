@@ -11,7 +11,6 @@ import Kuifje.Syntax
 import Kuifje.Expr
 import Kuifje.Stmt
 
-import Prelude hiding ((!!), return, fmap, (>>=))
 import Control.Lens hiding (Profunctor)
 import Data.Semigroup
 import Data.Ratio
@@ -185,7 +184,7 @@ translateExecKuifje (Sampling id exprD) fBody fCntx list =
 translateExecKuifje stmt _ _ list = error ("Invalid Statement:\n" ++ (show stmt) ++ "\nList:\n" ++ (monadType list))
 
 project :: Dist (Dist Gamma) -> Dist (Dist Rational)
-project = fmap (fmap (\s -> getRational s "y"))
+project = fmapDist (fmapDist (\s -> getRational s "y"))
 
 initGamma :: Rational -> Rational -> Gamma
 initGamma x y = let g = E.add E.empty ("x", (R x)) in 

@@ -22,7 +22,6 @@ import Language.Kuifje.Semantics
 import Language.Kuifje.Syntax
 import Language.Kuifje.ShallowConsts
 import Text.PrettyPrint.Boxes (printBox)
-import Prelude hiding ((!!), fmap, (>>=))
 import qualified Data.Map as Map
 
 import Data.IORef
@@ -31,7 +30,7 @@ getFrom g s | Just x <- E.lookup g s = x
             | otherwise = error ("Not going to happend " ++ s)
             
 project :: String -> Dist (Dist Gamma) -> Dist (Dist Value)
-project var = fmap (fmap (\s -> getFrom s var))
+project var = fmapDist (fmapDist (\s -> getFrom s var))
 
 processFlag :: String -> String -> [(String, (Dist (Dist Value)))] -> IO ()
 processFlag "json1" fName values = createJson1 fName values

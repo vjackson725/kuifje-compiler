@@ -11,7 +11,6 @@ import Kuifje.Syntax
 import Kuifje.Expr
 import Kuifje.Stmt
 
-import Prelude hiding ((!!), return, fmap, (>>=))
 import Control.Lens hiding (Profunctor)
 import Data.Semigroup
 import Data.Ratio
