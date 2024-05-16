@@ -125,3 +125,7 @@ choose p x y = D $ M.fromListWith (+) [(x, p), (y, 1 - p)]
 -- | Sum the probabilities in the distribution.
 weight :: Dist a -> Prob
 weight = M.foldr (+) 0 . runD
+
+-- | The bernoulli distribution between a and b, with weight w.
+bernoulli :: Ord a => a -> a -> Prob -> Dist a
+bernoulli a b w = D $ M.fromList [(a, w),(b, 1-w)]
