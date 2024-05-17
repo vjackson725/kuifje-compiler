@@ -3,11 +3,11 @@ guess <- uniform [0..10];
 L = 0;
 R = 10;
 while guess != sec:
-    leak(guess < sec);
-    if guess < sec:
-        L = guess + 1;
-        guess = (L + R) div 2;
-    else:
-        R = guess;
-        guess = (L + R) div 2;
+  leak(guess < sec);
+  if guess < sec:
+    L = guess + 1;
+    guess = (L + R) div 2;
+  else:
+    R = guess;
+    guess = (L + R) div 2;
 

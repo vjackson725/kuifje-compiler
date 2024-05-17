@@ -1,9 +1,9 @@
 p <- uniform [0.3, 0.7];
 i = 0;
 while i < 2:
-   result <- 0 [p] 1;
-   leak(result);
-   i = i + 1;
+  result <- 0 [p] 1;
+  leak(result);
+  i = i + 1;
 
 supResult = set result;
 supSupResult = set supResult;

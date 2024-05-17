@@ -6,10 +6,8 @@ e = E;
 // e = 15;
 p = 1;
 while e != 0:
-    r = e % 2;
-    if r != 0:
-        p = p * b;
-    else:
-        skip;
-    b = b^2;
-    e = e div 2;
+  r = e % 2;
+  if r != 0:
+    p = p * b;
+  b = b^2;
+  e = e div 2;

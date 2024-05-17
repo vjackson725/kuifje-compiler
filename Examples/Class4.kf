@@ -9,12 +9,12 @@ N= len(A);
 // Search for any occurrence of 0 in A.
 n= 0;
 nn= N;
-c = N;
+c= N;
 while n<N:
   a= A[n];
   if a==0:
-        nn= n;
-        c = (a, n);
+    nn= n;
+    c = (a, n);
   n= n+1;
 b= (nn==N);
 leak(b); // ...whether 0 was there.
