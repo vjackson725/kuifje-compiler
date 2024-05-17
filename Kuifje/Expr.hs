@@ -4,29 +4,28 @@
 module Kuifje.Expr where 
 
 import qualified Kuifje.Env as E
-import qualified Data.Map as Map
 import Kuifje.Value
 import Kuifje.Parse
 import Kuifje.Syntax 
 
+import Control.Applicative
 import Control.Lens hiding (Profunctor)
-import Data.Semigroup
-import Data.Ratio
-import Data.Map.Strict
 import Data.List
+import qualified Data.Map as Map
+import Data.Map.Strict
+import Data.Ratio
+import Data.Semigroup
 import qualified Data.Set as DSET
 import Numeric
+import System.IO
+import Text.ParserCombinators.Parsec
+import Text.ParserCombinators.Parsec.Expr
 
 import Language.Kuifje.Distribution
---import Kuifje.PrettyPrint 
 import Language.Kuifje.PrettyPrint 
 import Language.Kuifje.Semantics
 import Language.Kuifje.Syntax
-import Control.Applicative
 
-import System.IO 
-import Text.ParserCombinators.Parsec
-import Text.ParserCombinators.Parsec.Expr
 
 (*^*) :: (RealFrac a, RealFrac b) => a -> b -> a
 x *^* y = realToFrac $ realToFrac x ** realToFrac y
@@ -94,7 +93,8 @@ cOperatorWarpper IsSubstrOf (T x) (T y) = (isSubsequenceOf x y)
 cOperatorWarpper Eq (T x) (T y) = ((isInfixOf x y) && (isInfixOf y x))
 cOperatorWarpper Ne (T x) (T y) = (not ((isInfixOf x y) && (isInfixOf y x)))
 
-cOperatorWarpper op v1 v2 = error ("Operator: " ++ (show op) ++ " Not found!\n" ++ (show v1) ++ "\n" ++ (show v2))
+cOperatorWarpper op v1 v2 =
+  error ("Operator: " ++ show op ++ " not found for " ++ valuePrettyType v1 ++ " vs. " ++ valuePrettyType v2)
 
 cOperator op d1 d2 =
   D $ fromListWith (+) [((B (cOperatorWarpper op x y)), p * q) | (x, p) <- toList $ runD d1,
