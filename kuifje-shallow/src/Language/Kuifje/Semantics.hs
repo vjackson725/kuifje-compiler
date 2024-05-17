@@ -90,7 +90,7 @@ hobsem f = multiply . toPair . (=>> obsem f)
 
 -- | Calculate Bayes Vulnerability for a distribution.
 bayesVuln :: Ord a => Dist a -> Prob
-bayesVuln = maximum . M.elems . runD . reduction
+bayesVuln = (\x -> if null x then 1 else maximum x) . M.elems . runD . reduction
 
 -- | Based on an entropy function for distributions, calculate the
 -- average entropy for a hyper-distribution.

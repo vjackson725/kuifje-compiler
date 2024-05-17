@@ -1,8 +1,9 @@
 {-# OPTIONS_GHC -Wall #-}
 
-{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 
 module Language.Kuifje.Distribution where
 
@@ -10,6 +11,7 @@ import qualified Data.Map.Strict as M
 import Data.Bifunctor (first)
 import Data.List (genericLength)
 import Data.Map.Strict (Map)
+import Data.Maybe (mapMaybe)
 
 -- | Type synonym for probabilities.
 type Prob = Rational
@@ -68,6 +70,14 @@ instance Ord a => Ord (Dist a) where
 type Hyper a = Dist (Dist a)
 
 
+-- | Convert from Dist to [(a, Prob)]
+distToList :: Dist a -> [(a, Prob)]
+distToList = M.toList . runD
+
+-- | Convert from [(a, Prob)] to Dist
+listToDist :: Ord a => [(a, Prob)] -> Dist a
+listToDist = D . M.fromListWith (+)
+
 -- | Convert from Dist to ProbList
 distToProbList :: Dist a -> ProbList a
 distToProbList = ProbList . M.toList . runD
@@ -80,6 +90,11 @@ probListToDist = D . M.fromListWith (+) . unProbList
 -- | fmap function for distributions.
 fmapDist :: (Ord b) => (a -> b) -> Dist a -> Dist b
 fmapDist f = probListToDist . fmap f . distToProbList
+
+-- | mapMaybe function for distributions.
+--   Note, does not renormalise the distribution.
+mapMaybeDist :: (Ord b) => (a -> Maybe b) -> Dist a -> Dist b
+mapMaybeDist f = listToDist . mapMaybe (\(a,p) -> (,p) <$> f a) . distToList
 
 -- | fmap function for distributions, where f is injective.
 --   Requires f is injective on all values in the domain of the Dist.

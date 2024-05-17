@@ -58,8 +58,11 @@ instance (Show a, Show b, Show c, Show d) => Boxable (a,b,c,d) where
   toBox = PP.text . show
 
 distToBox :: (Ord a, Boxable a) => Dist a -> PP.Box
-distToBox =
-  tabulate . map (\(a,b) -> [toBox b, toBox a]) . HM.toList . unpackD
+distToBox d =
+  let ps = HM.toList . unpackD $ d
+   in if null ps
+      then PP.text "✗"
+      else tabulate . map (\(a,b) -> [toBox b, toBox a]) $ ps
 
 instance (Boxable a, Ord a) => Boxable (Dist a) where
   toBox = distToBox
