@@ -1,0 +1,15 @@
+//
+// While loop with dependent internal p-choice, using if-expression
+//
+
+i <- uniform [0,1,2,3,4,5];
+
+if (i < 4):
+  x = 1
+
+if (i < 4):
+  y = 1
+elif (i < 3):
+  y = 2
+else:
+  y = 3
