@@ -264,10 +264,11 @@ stmtBlock ref =
     curr <- indentation
    --  !_ <- trace ("(ref " ++ show ref ++ ")") . traceWith (\x -> "(curr " ++ show x ++ ")") <$> return ()
     guard (isSameCol ref curr || isSameLine ref curr) -- when not the same in line or col, early exit
-   --  !input <- traceShowId . take 10 <$> getInput
+   --  !_ <- traceShowId . takeWhile ((/=) '\n') <$> getInput
     c <- statement -- statement eats its trailing whitespace
+   --  let !_ = traceShowId c
     skipMany (whiteSpace << semi) -- remove semicolons if are any
-    cs2 <- (eof >> return []) <|> stmtBlock ref
+    cs2 <- stmtBlock ref <|> return []
     return (c : cs2)) <?> "statement block"
 
 -- | Collect a block of statements at the same indentation level, as a statement.
