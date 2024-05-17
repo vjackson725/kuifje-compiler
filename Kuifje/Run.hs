@@ -1,5 +1,7 @@
 module Kuifje.Run where
 
+import Debug.Trace (traceShowId)
+
 import Kuifje.Stmt
 import Kuifje.Translator
 import Kuifje.LivenessAnalysis

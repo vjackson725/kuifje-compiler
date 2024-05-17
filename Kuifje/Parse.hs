@@ -3,14 +3,19 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE BangPatterns #-}
+
 module Kuifje.Parse where
 
-import Kuifje.Syntax
-import Prelude
-import System.IO 
-import Data.Ratio
-import Data.Set
+import Debug.Trace
+
 import Control.Monad
+import Data.Char (generalCategory, GeneralCategory(..))
+import Data.Functor.Identity
+import Data.Ratio
+import Data.Set (Set)
+import qualified Data.Set as Set
+import System.IO
 import Text.ParserCombinators.Parsec
 import Text.Parsec.Char
 import Text.Parsec (ParsecT)
@@ -21,7 +26,8 @@ import qualified Text.Parsec as ParsecCl
 import qualified Text.Parsec.Indent.Explicit as Explicit
 import qualified Text.Parsec.Indent.Internal as Internal
 import qualified Text.ParserCombinators.Parsec.Token as Token
-import Data.Functor.Identity
+
+import Kuifje.Syntax
 
 --
 -- Parsec Language Setup
@@ -60,7 +66,6 @@ languageDef =
                                       , "csv"
                                       , "for"
                                       ]
-
             , Token.reservedOpNames = ["+"
                                       , "-"
                                       , "^"
@@ -137,38 +142,40 @@ kChoice c =
 -- Statements
 --
 
-statements :: Parser Stmt
-statements =
-  do whiteSpace
-     list <- sepEndBy statement (semi >> whiteSpace)
-     return $ case list of
-               [] -> Skip     -- the empty program is skip
-               [s] -> s       -- a single statement is just itself
-               ps -> Seq ps   -- multiple statements are sequenced
+-- | End of Line
+eol :: Parser ()
+eol = void endOfLine <|> eof
 
-statement :: Parser Stmt
-statement = buildExpressionParser sOperators sTerm
+collapsedSeq :: [Stmt] -> Stmt
+collapsedSeq cs = case cs of
+                     [] -> Skip     -- the empty program is skip
+                     [s] -> s       -- a single statement is just itself
+                     ps -> Seq ps   -- multiple statements are sequenced
 
 sOperators =
    [[Infix (kChoice Echoice) AssocLeft]]
 
+-- | Parse a statement.
+statement :: Parser Stmt
+statement = buildExpressionParser sOperators sTerm << whiteSpace <?> "statement"
+
 sTerm :: Parser Stmt
-sTerm = (braces statements
-         <|> funcStmt
-         <|> returnStmt
-         <|> try plusplusStmt
-         <|> try lesslessStmt
-         <|> try samplingStmt
-         <|> try supportStmt
-         <|> try readStmt
-         <|> try listCallStmt
-         <|> try assignStmt
-         <|> ifStmt
-         <|> whileStmt
-         <|> forStmt
-         <|> skipStmt
-         <|> vidStmt
-         <|> leakStmt) << whiteSpace
+sTerm = (    (try plusplusStmt  <?> "sTerm:plusplus")
+--         <|> (braces codeBlock  <?> "sTerm:braces")  -- doesn't really work well with indent-sensitivity
+         <|> (try lesslessStmt  <?> "sTerm:lessless")
+         <|> (try samplingStmt  <?> "sTerm:sampling")
+         <|> (try supportStmt   <?> "sTerm:support")
+         <|> (try readStmt      <?> "sTerm:read")
+         <|> (try listCallStmt  <?> "sTerm:listCall")
+         <|> (funcStmt          <?> "sTerm:func")
+         <|> (returnStmt        <?> "sTerm:return")
+         <|> (ifStmt            <?> "sTerm:if")
+         <|> (whileStmt         <?> "sTerm:while")
+         <|> (forStmt           <?> "sTerm:for")
+         <|> (skipStmt          <?> "sTerm:skip")
+         <|> (vidStmt           <?> "sTerm:vid")
+         <|> (leakStmt          <?> "sTerm:leak")
+         <|> (assignStmt        <?> "sTerm:assign")) << whiteSpace
 
 elseStmt :: Parser (Expr,Stmt)
 elseStmt = 
@@ -183,7 +190,8 @@ elseStmt =
 
 ifCondStmt :: Parser (Expr,Stmt)
 ifCondStmt =
-   do ref <- indentationBlock
+   do lookAhead (reserved "if") -- fail early
+      ref <- indentationBlock
       reserved "if"
       cond <- expression
       reservedOp ":"
@@ -215,10 +223,10 @@ getIfBlock True ref = do
       pos <- indentation
       (cond, stmt) <- option ((RBinary Ne (RationalConst (1 % 1)) (RationalConst (1 % 1))),Skip) (elifCondStmt <|> elseStmt)
       newPos <- indentation
-      if (isSamePosition pos newPos)
+      if (isSameCol pos newPos)
          then return stmt
          else 
-           do elseBlock <- (getIfBlock (not (isSamePosition pos newPos)) ref)
+           do elseBlock <- (getIfBlock (not (isSameCol pos newPos)) ref)
               return (If cond stmt elseBlock)
 
 ifStmt :: Parser Stmt
@@ -244,40 +252,42 @@ indentationBlock = do
     return $! Internal.Indentation {Internal.iLine = sourceLine pos, Internal.iColumn = ((sourceColumn pos) + 2)}
 
 -- | Verifies if the position is in the same position
+--   N.B. requires both the same column, and the same *line*
 isSamePosition :: Internal.Indentation -> Internal.Indentation -> Bool
 isSamePosition ref pos = ((Internal.iColumn pos == Internal.iColumn ref) && (Internal.iLine pos == Internal.iLine ref))
+
+-- | Verifies if the position is in the same column.
+isSameCol :: Internal.Indentation -> Internal.Indentation -> Bool
+isSameCol ref pos = (Internal.iColumn pos == Internal.iColumn ref)
+
+-- | Verifies if the position is on the same line.
+isSameLine :: Internal.Indentation -> Internal.Indentation -> Bool
+isSameLine ref pos = (Internal.iLine pos == Internal.iLine ref)
 
 -- | Verifies if the position is in the same block as the reference position
 isInBlock :: Internal.Indentation -> Internal.Indentation -> Bool
 isInBlock ref pos = (Internal.iColumn pos >= Internal.iColumn ref)
 
--- | Parses a block of lines at the same indentation level starting at the
--- current position
-getBlock :: Bool -> Internal.Indentation -> Parser Stmt
-getBlock False _ = return $ (Seq [])
-getBlock True ref = do 
-      stmt <- getNextStmt
-      pos <- indentation
-      (Seq ls) <- option (Seq []) (getBlock (isInBlock ref pos) ref)
-      return $ (Seq (stmt : ls))
+-- | Collect a block of statements at the same indentation level.
+stmtBlock :: Internal.Indentation -> Parser [Stmt]
+stmtBlock ref =
+  (do
+    whiteSpace -- clear whitespace before the first statement
+    curr <- indentation
+    guard (isSameCol ref curr || isSameLine ref curr) -- when not the same, early exit
+   --  input <- take 10 <$> getInput
+    c <- {- traceShow input <$> -} statement
+    cs2 <- (eof >> return []) <|> stmtBlock ref
+    return (c : cs2))  <?> "statement block"
 
--- | Collect the block of instruction in the same indentation level
+-- | Collect a block of statements at the same indentation level, as a statement.
 codeBlock :: Internal.Indentation -> Parser Stmt
-codeBlock ref = do
-    stmt <- (getBlock (isInBlock ref ref) ref)
-    return $ stmt
-
--- | Returns the next Statement in the program
-getNextStmt :: Parser Stmt
-getNextStmt =
-  do whiteSpace
-     stmt <- statement
-     semi
-     return $ stmt
+codeBlock ref = collapsedSeq <$> stmtBlock ref <?> "code block"
 
 funcStmt :: Parser Stmt
 funcStmt = 
-  do ref <- indentationBlock
+  do lookAhead (reserved "def") -- fail early
+     ref <- indentationBlock
      reserved "def"
      name <- identifier
      inputs <- parens (sepBy identifier (symbol ","))
@@ -289,21 +299,21 @@ funcStmt =
      return $ FuncStmt name body inputs
 
 returnStmt :: Parser Stmt
-returnStmt =
-  do reserved "return"
-     outputs <- expression
-     return $ ReturnStmt outputs
-     
+returnStmt = reserved "return" >> ReturnStmt <$> expression
+
 whileStmt :: Parser Stmt
 whileStmt =
-  do ref <- indentationBlock
+  do lookAhead (reserved "while") -- fail early
+     ref <- indentationBlock -- expected indentation in the following block
      reserved "while"
      cond <- expression
      reservedOp ":"
-     stmt <- codeBlock ref
-     input <- getInput
-     setInput (";" ++ input)
-     return $ While cond stmt 
+     endOfLine
+     curr <- indentation -- actual indentation at the start of the block
+     unless (isSameCol ref curr) (fail "incorrect indentation in while")
+     stmt <- statement -- we expect at least one statement in the body
+     stmts <- stmtBlock ref
+     return $ While cond (collapsedSeq (stmt : stmts))
 
 forStmt :: Parser Stmt
 forStmt =
@@ -435,29 +445,27 @@ eOperators =
 
 eTermR :: Parser Expr
 eTermR = (parens expression
-        <|> (reserved "true"  >> return (BoolConst True ) <?> "true")
-        <|> (reserved "false" >> return (BoolConst False) <?> "false")
-        <|> (reserved "True"  >> return (BoolConst True ) <?> "true")
-        <|> (reserved "False" >> return (BoolConst False) <?> "false")
-        <|> setExpr
-        <|> listExpr
-        <|> try listElExpr
-        <|> try listAppend
-        <|> try listInsert
-        <|> try listExtend
-        <|> try listRemove
-        <|> try listLength
-        <|> try listRange
-        <|> try callExpr
-        <|> try uniformFromSet
-        <|> try uniformIchoices
-        <|> try uniformSetVar
-        <|> try uniformIchoicesListComp
-        <|> try notUniformIchoices
-        <|> geometricIchoices
-        <|> (liftM RationalConst (try decimalRat) <?> "rat")
-        <|> (liftM Var identifier <?> "var")
-        <|> (liftM Text stringLiteral <?> "text")
+        <|> ((reserved "true" <|> reserved "True")    >> return (BoolConst True)  <?> "eTerm:true")
+        <|> ((reserved "false" <|> reserved "False")  >> return (BoolConst False) <?> "eTerm:false")
+        <|> (setExpr                              <?> "eTerm:setExpr")
+        <|> (listExpr                             <?> "eTerm:listExpr")
+        <|> (try listElExpr                       <?> "eTerm:listElExpr")
+        <|> (try listAppend                       <?> "eTerm:listAppend")
+        <|> (try listInsert                       <?> "eTerm:listInsert")
+        <|> (try listExtend                       <?> "eTerm:listExtend")
+        <|> (try listRemove                       <?> "eTerm:listRemove")
+        <|> (try listLength                       <?> "eTerm:listLength")
+        <|> (try listRange                        <?> "eTerm:listRange")
+        <|> (try callExpr                         <?> "eTerm:callExpr")
+        <|> (try uniformFromSet                   <?> "eTerm:uniformFromSet")
+        <|> (try uniformIchoices                  <?> "eTerm:uniformIchoices")
+        <|> (try uniformSetVar                    <?> "eTerm:uniformSetVar")
+        <|> (try uniformIchoicesListComp          <?> "eTerm:uniformIchoicesListComp")
+        <|> (try notUniformIchoices               <?> "eTerm:notUniformIchoices")
+        <|> (geometricIchoices                    <?> "eTerm:geometricIchoices")
+        <|> (liftM RationalConst (try decimalRat) <?> "eTerm:rat")
+        <|> (liftM Var identifier                 <?> "eTerm:var")
+        <|> (liftM Text stringLiteral             <?> "eTerm:text")
         <?> "eTerm") << whiteSpace
 
 eTermL :: Parser Expr
@@ -503,7 +511,7 @@ uniformFromSet =
            reservedOp "{"
            list <- sepBy expression (symbol ",")
            reservedOp "}"
-           let values = fromList list
+           let values = Set.fromList list
            return $ SetIchoiceDist (Eset values)
 
 uniformSetVar = 
@@ -526,7 +534,7 @@ setExpr =
         do reservedOp "{"
            list <- sepBy expression (symbol ",")
            reservedOp "}"
-           let values = fromList list
+           let values = Set.fromList list
            return $ Eset values
 
 tupleExpr =
@@ -610,13 +618,13 @@ callExpr =
 -- Output only
 parseString :: String -> Stmt
 parseString str =
-        case parse statements "" str of
+        case parse (indentation >>= codeBlock) "" str of
           Left e  -> error $ show e
           Right r -> r
 
 parseFile :: String -> IO Stmt
 parseFile file =
         do program  <- readFile file
-           case parse statements "" program of
+           case parse (indentation >>= codeBlock) "" program of
                 Left e  -> print e >> fail "parse error"
                 Right r -> return r

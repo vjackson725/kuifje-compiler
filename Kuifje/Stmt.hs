@@ -85,6 +85,7 @@ data MonadValue = M (Kuifje Gamma)
            | C Expr MonadValue MonadValue
            | E MonadValue MonadValue Expr
            | W Expr MonadValue
+  deriving (Show)
 
 monadType :: MonadValue -> String
 monadType (A id e) = ("\nAssign: " ++ id ++ " =>> " ++ (show e))
