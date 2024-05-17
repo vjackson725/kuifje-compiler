@@ -96,7 +96,10 @@ languageDef =
 
 lexer = Token.makeTokenParser languageDef
 
-identifier    = Token.identifier    lexer -- parses an identifier
+-- identifier    = Token.identifier    lexer -- parses an identifier
+variable = Token.identifier lexer <?> "variable" -- parses a variable
+fnname = Token.identifier lexer <?> "function name" -- parses a function name
+
 reserved      = Token.reserved      lexer -- parses a reserved name
 reservedOp    = Token.reservedOp    lexer -- parses an operator
 parens        = Token.parens        lexer -- parses surrounding parenthesis:
@@ -175,7 +178,7 @@ sTerm = (    (try plusplusStmt  <?> "sTerm:plusplus")
          <|> (skipStmt          <?> "sTerm:skip")
          <|> (vidStmt           <?> "sTerm:vid")
          <|> (leakStmt          <?> "sTerm:leak")
-         <|> (assignStmt        <?> "sTerm:assign")) << whiteSpace
+         <|> (assignStmt        <?> "sTerm:assign"))
 
 elseStmt :: Parser (Expr,Stmt)
 elseStmt = 
@@ -276,9 +279,12 @@ stmtBlock ref =
     curr <- indentation
     guard (isSameCol ref curr || isSameLine ref curr) -- when not the same, early exit
    --  input <- take 10 <$> getInput
-    c <- {- traceShow input <$> -} statement
+   --  !c <- traceShow input . traceShowId <$> statement
+    c <- statement
+    -- statement eats its trailing whitespace
+    try (semi << whiteSpace) -- remove semicolon if there is one
     cs2 <- (eof >> return []) <|> stmtBlock ref
-    return (c : cs2))  <?> "statement block"
+    return (c : cs2)) <?> "statement block"
 
 -- | Collect a block of statements at the same indentation level, as a statement.
 codeBlock :: Internal.Indentation -> Parser Stmt
@@ -289,8 +295,8 @@ funcStmt =
   do lookAhead (reserved "def") -- fail early
      ref <- indentationBlock
      reserved "def"
-     name <- identifier
-     inputs <- parens (sepBy identifier (symbol ","))
+     name <- fnname
+     inputs <- parens (sepBy variable (symbol ","))
      reservedOp ":"
      body <- codeBlock ref
      -- Output Parameters - Only in the end of the function:
@@ -319,7 +325,7 @@ forStmt :: Parser Stmt
 forStmt =
   do ref <- indentationBlock
      reserved "for"
-     var <- identifier
+     var <- variable
      reservedOp "in"
      list <- expression
      reservedOp ":"
@@ -330,33 +336,33 @@ forStmt =
 
 assignStmt :: Parser Stmt
 assignStmt =
-  do var  <- identifier
+  do var <- variable
      reservedOp "="
      expr <- expression
      return $ Assign var expr
 
 plusplusStmt :: Parser Stmt
 plusplusStmt =
-  do var  <- identifier
+  do var <- variable
      reservedOp "++"
      return $ Plusplus var
 
 lesslessStmt :: Parser Stmt
 lesslessStmt =
-  do var  <- identifier
+  do var <- variable
      reservedOp "--"
      return $ Lessless var
 
 samplingStmt :: Parser Stmt
 samplingStmt =
-  do var <- identifier
+  do var <- variable
      reservedOp "<-"
      expr <- expression
      return $ Sampling var expr
 
 supportStmt :: Parser Stmt
 supportStmt =
-  do var <- identifier
+  do var <- variable
      reservedOp "="
      reserved "set"
      expr <- expression
@@ -368,7 +374,7 @@ skipStmt = reserved "skip" >> return Skip
 vidStmt :: Parser Stmt
 vidStmt = 
   do reserved "vis" 
-     var <- identifier
+     var <- variable
      return $ Vis var
 
 leakStmt :: Parser Stmt
@@ -381,7 +387,7 @@ leakStmt =
 
 readStmt :: Parser Stmt
 readStmt =
-  do var <- identifier
+  do var <- variable
      reservedOp "="
      reserved "csv"
      reservedOp "("
@@ -397,7 +403,7 @@ readStmt =
 
 listCallStmt :: Parser Stmt
 listCallStmt =
-  do var <- identifier
+  do var <- variable
      char '.'
      input <- getInput
      setInput (var ++ " ls_" ++ input)
@@ -464,7 +470,7 @@ eTermR = (parens expression
         <|> (try notUniformIchoices               <?> "eTerm:notUniformIchoices")
         <|> (geometricIchoices                    <?> "eTerm:geometricIchoices")
         <|> (liftM RationalConst (try decimalRat) <?> "eTerm:rat")
-        <|> (liftM Var identifier                 <?> "eTerm:var")
+        <|> (liftM Var variable                   <?> "eTerm:var")
         <|> (liftM Text stringLiteral             <?> "eTerm:text")
         <?> "eTerm") << whiteSpace
 
@@ -516,7 +522,7 @@ uniformFromSet =
 
 uniformSetVar = 
         do reserved "uniform"
-           expr <- liftM Var identifier
+           expr <- liftM Var variable
            return $ SetIchoiceDist expr
 
 getParam :: Integer -> [Expr] -> Expr
@@ -552,14 +558,14 @@ listExpr =
            return $ ListExpr elements
 
 listElExpr =
-        do varID <- identifier
+        do varID <- variable
            reservedOp "["
            varIndex <- expression
            reservedOp "]"
            return $ ListElem varID varIndex
 
 listAppend =
-        do var <- identifier
+        do var <- variable
            reserved "ls_append"
            reservedOp "("
            elem <- expression
@@ -567,7 +573,7 @@ listAppend =
            return $ ListAppend var elem
 
 listInsert =
-        do var <- identifier
+        do var <- variable
            reserved "ls_insert"
            reservedOp "("
            index <- expression
@@ -577,7 +583,7 @@ listInsert =
            return $ ListInsert var index elem
 
 listRemove =
-        do var <- identifier
+        do var <- variable
            reserved "ls_remove"
            reservedOp "("
            elem <- expression
@@ -592,10 +598,10 @@ listLength =
            return $ ListLength list
 
 listExtend =
-        do l1 <- identifier
+        do l1 <- variable
            reserved "ls_extend"
            reservedOp "("
-           l2 <- identifier
+           l2 <- variable
            reservedOp ")"
            return $ ListExtend l1 l2
 
@@ -609,7 +615,7 @@ listRange =
            return $ ListExpr [(RationalConst (x % 1)) | x <- [l..r]]
 
 callExpr =
-        do name <- identifier
+        do name <- fnname
            reservedOp "("
            parameters <- sepBy expression (symbol ",")
            reservedOp ")" 
