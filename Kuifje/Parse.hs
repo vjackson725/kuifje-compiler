@@ -11,6 +11,7 @@ import Debug.Trace
 
 import Control.Monad
 import Data.Char (generalCategory, GeneralCategory(..))
+import Data.Functor ((<&>))
 import Data.Functor.Identity
 import Data.Ratio
 import Data.Set (Set)
@@ -177,67 +178,49 @@ sTerm = (    (try plusplusStmt  <?> "sTerm:plusplus")
          <|> (leakStmt          <?> "sTerm:leak")
          <|> (assignStmt        <?> "sTerm:assign"))
 
-elseStmt :: Parser (Expr,Stmt)
-elseStmt = 
-   do ref <- indentationBlock
-      reserved "else"
-      reservedOp ":"
-      body <- codeBlock ref
-      -- For else statements, the condition should be always true
-      input <- getInput
---      error ("Input is:\n" ++ (show input))
-      return $ ((RBinary Eq (RationalConst (1 % 1)) (RationalConst (1 % 1))) , body)
-
-ifCondStmt :: Parser (Expr,Stmt)
-ifCondStmt =
-   do lookAhead (reserved "if") -- fail early
-      ref <- indentationBlock
-      reserved "if"
-      cond <- expression
-      reservedOp ":"
-      body <- codeBlock ref
-      input <- getInput
-      return $ (cond, body)
-
-elifCondStmt :: Parser (Expr,Stmt)
-elifCondStmt =
-   do ref <- indentationBlock
-      reserved "elif"
-      cond <- expression
-      reservedOp ":"
-      body <- codeBlock ref
-      input <- getInput
-      return $ (cond, body)
-      
 checkIndent :: Expr -> Internal.Indentation -> Internal.Indentation -> Bool
 checkIndent expr ref pos = 
    if expr == (RBinary Ne (RationalConst (1 % 1)) (RationalConst (1 % 1)))
       then False
       else (isInBlock ref pos) 
 
--- | Parses a block of lines at the same indentation level starting at the
--- current position
-getIfBlock :: Bool -> Internal.Indentation -> Parser Stmt
-getIfBlock False _ = return $ Skip
-getIfBlock True ref = do
-      pos <- indentation
-      (cond, stmt) <- option ((RBinary Ne (RationalConst (1 % 1)) (RationalConst (1 % 1))),Skip) (elifCondStmt <|> elseStmt)
-      newPos <- indentation
-      if (isSameCol pos newPos)
-         then return stmt
-         else 
-           do elseBlock <- (getIfBlock (not (isSameCol pos newPos)) ref)
-              return (If cond stmt elseBlock)
-
+-- | Parse an if statement.
 ifStmt :: Parser Stmt
 ifStmt =
-   do ref <- indentation
-      (cond, stmt) <- ifCondStmt
-      pos <- indentation
-      elseBlock <- (getIfBlock (isInBlock ref pos) ref)
-      input <- getInput
-      setInput (";" ++ input)
-      return $ (If cond stmt elseBlock)
+  do lookAhead (reserved "if") -- fail early
+     ref <- indentationBlock -- expected column indentation for the block
+     reserved "if"
+     econd <- expression
+     reservedOp ":"
+     whiteSpace -- eat the space to the next token
+     curr <- indentation
+     unless (isLessLine ref curr) (fail "if requires a new line")
+     stmtsT <- stmtBlock ref
+     when (null stmtsT) (fail "if needs a body")
+     stmtElse <- try (ifStmtElse ref) <|> return Skip
+     return $ If econd (collapsedSeq stmtsT) stmtElse
+
+-- | Parse the elif/else part of an if statement.
+ifStmtElse :: Internal.Indentation -> Parser Stmt
+ifStmtElse ref =
+  (do reserved "elif"
+      econd <- expression
+      reservedOp ":"
+      whiteSpace -- eat the space to the next token
+      curr <- indentation
+      unless (isLessLine ref curr) (fail "elif requires a new line")
+      stmtsElif <- stmtBlock ref
+      when (null stmtsElif) (fail "elif needs a body")
+      stmtElse <- ifStmtElse ref
+      return $ If econd (collapsedSeq stmtsElif) stmtElse) <|>
+  (do reserved "else"
+      reservedOp ":"
+      whiteSpace
+      curr <- indentation
+      unless (isLessLine ref curr) (fail "else requires a new line")
+      stmts <- stmtBlock ref
+      when (null stmts) (fail "else needs a body")
+      return $ collapsedSeq stmts)
 
 -- | Obtain the current indentation, to be used as a reference later.
 indentation :: Monad m => ParsecT s u m Internal.Indentation
