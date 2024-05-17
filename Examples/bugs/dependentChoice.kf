@@ -8,7 +8,7 @@ N = 2;
 // while (i < N):
 //   x2 <- (0 [0.5] 1) [i/N] x2;
 //   y2 <- 0 if x2 == 1 else 0;
-//   i++;
+//   i = i + 1;
 
 // This one breaks the parser!
 x = -1;
@@ -17,4 +17,4 @@ i = 0;
 while (i < N):
   x <- (0 [0.5] 1) [i/N] x;
   y <- 0 [x] 1;
-  i++;
+  i = i + 1;

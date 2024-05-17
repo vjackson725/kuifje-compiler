@@ -117,37 +117,34 @@ stringLiteral = Token.stringLiteral lexer
 -- Generic
 --
 
-s << t = do { x <- s;  t; return x }
+(<<) :: Monad m => m a -> m b -> m a
+s << t = do { x <- s; t; return x }
 
 stringSymbol :: Parser String
 stringSymbol = 
-  do reserved "\""
-     text <- many1 digit
-     reserved "\""
-     return text
+  (do reserved "\""
+      text <- many1 digit
+      reserved "\""
+      return text) <?> "string"
 
 decimalRat :: Parser Rational
 decimalRat = 
-  do ns <- many1 digit
-     ms <- try (char '.' >> many digit) <|> return [] 
-     let pow10 = toInteger $ length ms
-     let (Right n) = parse natural "" (ns ++ ms)
-     return (n % (10 ^ pow10))
+  (do ns <- many1 digit
+      ms <- try (char '.' >> many digit) <|> return [] 
+      let pow10 = toInteger $ length ms
+      let (Right n) = parse natural "" (ns ++ ms)
+      return (n % (10 ^ pow10))) <?> "number"
 
 kChoice :: (a -> a -> Expr -> a) -> Parser (a -> a -> a)
 kChoice c =
-      do symbol "["
-         expr <- expression
-         symbol "]"
-         return $ \x y -> c x y expr  
+  (do symbol "["
+      expr <- expression
+      symbol "]"
+      return $ \x y -> c x y expr) <?> "probabilistic choice"
 
 --
 -- Statements
 --
-
--- | End of Line
-eol :: Parser ()
-eol = void endOfLine <|> eof
 
 collapsedSeq :: [Stmt] -> Stmt
 collapsedSeq cs = case cs of
@@ -271,18 +268,22 @@ isSameLine ref pos = (Internal.iLine pos == Internal.iLine ref)
 isInBlock :: Internal.Indentation -> Internal.Indentation -> Bool
 isInBlock ref pos = (Internal.iColumn pos >= Internal.iColumn ref)
 
+-- | Verifies if the position is on the same line.
+isLessLine :: Internal.Indentation -> Internal.Indentation -> Bool
+isLessLine ref pos = (Internal.iLine ref < Internal.iLine pos)
+
 -- | Collect a block of statements at the same indentation level.
+--   Expects at least one statement.
 stmtBlock :: Internal.Indentation -> Parser [Stmt]
 stmtBlock ref =
   (do
     whiteSpace -- clear whitespace before the first statement
     curr <- indentation
-    guard (isSameCol ref curr || isSameLine ref curr) -- when not the same, early exit
-   --  input <- take 10 <$> getInput
-   --  !c <- traceShow input . traceShowId <$> statement
-    c <- statement
-    -- statement eats its trailing whitespace
-    try (semi << whiteSpace) -- remove semicolon if there is one
+   --  !_ <- trace ("(ref " ++ show ref ++ ")") . traceWith (\x -> "(curr " ++ show x ++ ")") <$> return ()
+    guard (isSameCol ref curr || isSameLine ref curr) -- when not the same in line or col, early exit
+   --  !input <- traceShowId . take 10 <$> getInput
+    c <- statement -- statement eats its trailing whitespace
+    skipMany (whiteSpace << semi) -- remove semicolons if are any
     cs2 <- (eof >> return []) <|> stmtBlock ref
     return (c : cs2)) <?> "statement block"
 
@@ -310,16 +311,16 @@ returnStmt = reserved "return" >> ReturnStmt <$> expression
 whileStmt :: Parser Stmt
 whileStmt =
   do lookAhead (reserved "while") -- fail early
-     ref <- indentationBlock -- expected indentation in the following block
+     ref <- indentationBlock -- expected column indentation for the block
      reserved "while"
      cond <- expression
      reservedOp ":"
-     endOfLine
+     whiteSpace -- eat the space to the next token
      curr <- indentation -- actual indentation at the start of the block
-     unless (isSameCol ref curr) (fail "incorrect indentation in while")
-     stmt <- statement -- we expect at least one statement in the body
+     unless (isLessLine ref curr) (fail "while expects a new line")
      stmts <- stmtBlock ref
-     return $ While cond (collapsedSeq (stmt : stmts))
+     when (null stmts) (fail "while needs a body")
+     return $ While cond (collapsedSeq stmts)
 
 forStmt :: Parser Stmt
 forStmt =
