@@ -1,0 +1,9 @@
+//
+// Bug
+//
+// This crashed the parser.
+// 
+
+p = False;
+t1 = 0;
+t1 = 1 if t1 == 1 && p else 0;
