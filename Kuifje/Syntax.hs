@@ -47,6 +47,8 @@ data Expr = Var String
           | INUchoicesDist [Expr]
           | SetIchoice Expr
           | SetIchoiceDist Expr
+          | DGaussianDist Expr Expr Expr -- mu (mean) and sigma (variance), vs
+          | DLaplaceDist Expr Expr -- t (scale parameter), vs
 
           -- Bool Expr
           | BoolConst Bool

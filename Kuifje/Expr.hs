@@ -1,6 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module Kuifje.Expr where 
 
 import qualified Kuifje.Env as E
@@ -10,9 +14,10 @@ import Kuifje.Syntax
 
 import Control.Applicative
 import Control.Lens hiding (Profunctor)
+import Data.Bifunctor (second)
 import Data.List
-import qualified Data.Map as Map
-import Data.Map.Strict
+import Data.Map (Map)
+import qualified Data.Map.Strict as M
 import Data.Ratio
 import Data.Semigroup
 import qualified Data.Set as DSET
@@ -79,8 +84,8 @@ aOperatorWarpper op (S x) (S y) =
 aOperatorWarpper op a b = error ("Unknow operation " ++ (show op) ++ " <> " ++ (show a) ++ " <> " ++ (show b))
 
 aOperator op d1 d2 = 
-  D $ fromListWith (+) [((aOperatorWarpper op x y), p * q) | (x, p) <- toList $ runD d1,
-                                                             (y, q) <- toList $ runD d2]
+  D $ M.fromListWith (+) [((aOperatorWarpper op x y), p * q) | (x, p) <- M.toList $ runD d1,
+                                                             (y, q) <- M.toList $ runD d2]
 
 cOperatorWarpper Lt (R x) (R y) = (x < y)
 cOperatorWarpper Gt (R x) (R y) = (x > y)
@@ -97,11 +102,11 @@ cOperatorWarpper op v1 v2 =
   error ("Operator: " ++ show op ++ " not found for " ++ valuePrettyType v1 ++ " vs. " ++ valuePrettyType v2)
 
 cOperator op d1 d2 =
-  D $ fromListWith (+) [((B (cOperatorWarpper op x y)), p * q) | (x, p) <- toList $ runD d1,
-                                                                 (y, q) <- toList $ runD d2]
+  D $ M.fromListWith (+) [((B (cOperatorWarpper op x y)), p * q) | (x, p) <- M.toList $ runD d1,
+                                                                 (y, q) <- M.toList $ runD d2]
 bOperator op d1 d2 = 
-  D $ fromListWith (+) [((B (op x y)), p * q) | (B x, p) <- toList $ runD d1,
-                                                (B y, q) <- toList $ runD d2]
+  D $ M.fromListWith (+) [((B (op x y)), p * q) | (B x, p) <- M.toList $ runD d1,
+                                                (B y, q) <- M.toList $ runD d2]
 
 createSetList [] = []
 createSetList ls =
@@ -113,7 +118,7 @@ setValueWarpper (S x) = (S (DSET.fromList (createSetList (DSET.elems (DSET.power
 -- DSET.powerSet x
 
 sOperatorPowerSet d1 =
-  D $ fromListWith (+) [((setValueWarpper x), p) | (x, p) <- toList $ runD d1]
+  D $  M.fromListWith (+) [((setValueWarpper x), p) | (x, p) <- M.toList $ runD d1]
 
 sBinOperatorWrapper op (S x) (S y) =
   case op of
@@ -133,8 +138,8 @@ sBinOperatorWrapper op x y =
     otherwise -> error "Unknow set membership operation"
 
 sBinOperator op d1 d2 =
-  D $ fromListWith (+) [((B (sBinOperatorWrapper op x y)), p * q) | (x, p) <- toList $ runD d1,
-                                                                    (y, q) <- toList $ runD d2]
+  D $  M.fromListWith (+) [((B (sBinOperatorWrapper op x y)), p * q) | (x, p) <- M.toList $ runD d1,
+                                                                    (y, q) <- M.toList $ runD d2]
 updateProbs :: [(Prob, Value)] -> Prob -> [(Prob, Value)]
 updateProbs [] _ = []
 updateProbs ls p = let hd = head ls
@@ -210,37 +215,37 @@ lenghtFromList ls = (1 + (lenghtFromList (tail ls)))
 
 exprToValue2Cntx :: Expr -> (Dist Value) -> (Dist Value) -> Value
 exprToValue2Cntx (ListExtend id list) ev1 ev2 = 
-  let ls1 = fst (head (assocs (unpackD ev1)))
+  let ls1 = fst (head (M.assocs (unpackD ev1)))
       el1 = extractFromListTy ls1
-      ls2 = fst (head (assocs (unpackD ev2)))
+      ls2 = fst (head (M.assocs (unpackD ev2)))
       el2 = extractFromListTy ls2
       newL = el1 ++ el2
    in (LS newL)
 exprToValue2Cntx (ListElem lsid index) ev1 ev2 =
-  let ls = fst (head (assocs (unpackD ev1)))
-      ind = fst (head (assocs (unpackD ev2)))
+  let ls = fst (head (M.assocs (unpackD ev1)))
+      ind = fst (head (M.assocs (unpackD ev2)))
       elems = extractFromListTy ls
    in if (isRational ind)
       then let (R id) = ind
             in recoverElemFromList elems (numerator id)
       else error ("Out of range access index in list: " ++ (show lsid)) 
 exprToValue2Cntx (ListElemDirect list index) ev1 ev2 =
-  let ls = fst (head (assocs (unpackD ev1)))
-      ind = fst (head (assocs (unpackD ev2)))
+  let ls = fst (head (M.assocs (unpackD ev1)))
+      ind = fst (head (M.assocs (unpackD ev2)))
       elems = extractFromListTy ls
    in if (isRational ind)
       then let (R id) = ind
             in recoverElemFromList elems (numerator id)
       else error ("Out of range access index in list: " ++ (show list))
 exprToValue2Cntx (ListAppend id elem) ev1 ev2 =
-  let ls = fst (head (assocs (unpackD ev1)))
-      el = fst (head (assocs (unpackD ev2)))
+  let ls = fst (head (M.assocs (unpackD ev1)))
+      el = fst (head (M.assocs (unpackD ev2)))
       elems = extractFromListTy ls
       newL = elems ++ [el]
    in (LS newL)
 exprToValue2Cntx (ListInsert id index elem) ev1 ev2 =
-  let ls = fst (head (assocs (unpackD ev1)))
-      el = fst (head (assocs (unpackD ev2)))
+  let ls = fst (head (M.assocs (unpackD ev1)))
+      el = fst (head (M.assocs (unpackD ev2)))
       elems = extractFromListTy ls
       id = exprToValue index ev1
    in if (isRational id)
@@ -251,7 +256,7 @@ exprToValue2Cntx (ListInsert id index elem) ev1 ev2 =
 
 
 exprToValue :: Expr -> (Dist Value) -> Value
---exprToValue (Var id) ev = let vals = distFromMapVals (assocs (unpackD ev))
+--exprToValue (Var id) ev = let vals = distFromMapVals (M.assocs (unpackD ev))
 --                           in  (PD (DSET.fromDistinctAscList vals))
                            --in if ((length vals) == 1)
                            --   then (snd (head (vals)))
@@ -278,7 +283,7 @@ exprToValue (ListExpr ls) ev =
   let l = lExprTolValues ls ev
    in (LS l)
 exprToValue (ListInsert id index elem) ev =
-  let ls = fst (head (assocs (unpackD ev)))
+  let ls = fst (head (M.assocs (unpackD ev)))
       elems = extractFromListTy ls
       el = exprToValue elem ev
       id = exprToValue index ev
@@ -288,13 +293,13 @@ exprToValue (ListInsert id index elem) ev =
                in (LS newL)
          else error ("Invalid index" ++ (show index))
 exprToValue (ListRemove id elem) ev =
-  let ls = fst (head (assocs (unpackD ev)))
+  let ls = fst (head (M.assocs (unpackD ev)))
       elems = extractFromListTy ls
       el = exprToValue elem ev
       newL = removeElemFromList elems el False
    in (LS newL)
 exprToValue (ListLength list) ev =
-  let ls = fst (head (assocs (unpackD ev)))
+  let ls = fst (head (M.assocs (unpackD ev)))
       elems = extractFromListTy ls
       r = lenghtFromList elems
    in (R (r % 1))
@@ -432,13 +437,13 @@ evalE (ExprIf cond e1 e2) = \s ->
         let cond' = runD $ (evalE cond) s
             e1' = (evalE e1) s
             e2' = (evalE e2) s 
-            d1 = case Data.Map.Strict.lookup (B True) cond' of 
-                   (Just p)  -> D $ Data.Map.Strict.map (*p) $ runD e1'
-                   otherwise -> D $ Data.Map.Strict.empty
-            d2 = case Data.Map.Strict.lookup (B False) cond' of 
-                   (Just p)  -> D $ Data.Map.Strict.map (*p) $ runD e2'
-                   otherwise -> D $ Data.Map.Strict.empty
-         in D $ unionWith (+) (runD d1) (runD d2)
+            d1 = case M.lookup (B True) cond' of 
+                   (Just p)  -> D $ M.map (*p) $ runD e1'
+                   otherwise -> D $ M.empty
+            d2 = case M.lookup (B False) cond' of 
+                   (Just p)  -> D $ M.map (*p) $ runD e2'
+                   otherwise -> D $ M.empty
+         in D $  M.unionWith (+) (runD d1) (runD d2)
 evalE (ABinary op e1 e2) = \s -> 
   let e1' = (evalE e1) s
       e2' = (evalE e2) s 
@@ -447,10 +452,10 @@ evalE (Ichoice e1 e2 p) = \s ->
   let e1' = (evalE e1) s
       e2' = (evalE e2) s 
       p'  = Data.List.foldr (\x y -> case x of (R x', q) -> x'*q*y) 1 
-              $ toList $ runD $ (evalE p ) s
-      d1 = D $ Data.Map.Strict.map (*p') $ runD e1'
-      d2 = D $ Data.Map.Strict.map (*(1-p')) $ runD e2'
-   in D $ unionWith (+) (runD d1) (runD d2)
+              $ M.toList $ runD $ (evalE p ) s
+      d1 = D $ M.map (*p') $ runD e1'
+      d2 = D $ M.map (*(1-p')) $ runD e2'
+   in D $  M.unionWith (+) (runD d1) (runD d2)
 evalE (IchoiceDist e1 e2 p) = \s ->
   let dw = fmapDist theRational $ evalE p s
    in bindDist dw (joinDist . bernoulli (evalE e1 s) (evalE e2 s))
@@ -470,8 +475,8 @@ evalE (IchoicesDist ls) = \s ->
 evalE (Tuple e p) = \s ->
   let e' = (evalE e) s
       p' = Data.List.foldr (\x y -> case x of (R x', q) -> x'*q*y) 1
-              $ toList $ runD $ (evalE p) s
-      d = D $ Data.Map.Strict.map (*p') $ runD e'
+              $ M.toList $ runD $ (evalE p) s
+      d = D $ M.map (*p') $ runD e'
    in D $ (runD d)
 evalE (INUchoices ls) =
   if (evalTList $ INUchoices ls) == 1.0
@@ -510,7 +515,7 @@ evalE (RBinary op e1 e2) = \s ->
       e2' = (evalE e2) s in 
       cOperator op e1' e2'
 evalE (Eset set) = \s -> 
-        let exprToValue elem = toList (runD ((evalE elem) s))
+        let exprToValue elem = M.toList (runD ((evalE elem) s))
             distList = Data.List.map exprToValue (DSET.toList set) 
             tmpf2 :: (Value, Prob) -> (Value, Prob) -> (Value, Prob)
             tmpf2 (S a, b) (c, d) = (S (DSET.insert c a), b*d)
@@ -520,20 +525,64 @@ evalE (Eset set) = \s ->
             init = [(S DSET.empty, 1)]
             resultList :: [(Value, Prob)]
             resultList = Data.List.foldr helperFun init distList
-         in D $ fromListWith (+) resultList
+         in D $  M.fromListWith (+) resultList
 evalE (SetIchoice e) = \s -> 
         let d = (evalE e) s 
             resultList = concat [[(elem, p/(toInteger (DSET.size set) % 1)) 
                                         | elem <- DSET.toList set] 
-                                        | (S set, p) <- toList (runD d)]
-         in D $ fromListWith (+) resultList
+                                        | (S set, p) <- M.toList (runD d)]
+         in D $  M.fromListWith (+) resultList
 evalE (SetIchoiceDist e) = \s -> 
         let d = (evalE e) s
             resultList = concat [[(p/(toInteger (DSET.size set) % 1), elem)
                                         | elem <- DSET.toList set]
-                                        | (S set, p) <- toList (runD d)]
+                                        | (S set, p) <- M.toList (runD d)]
             dist = (PD (DSET.fromDistinctAscList resultList))
          in returnDist dist
+evalE (DGaussianDist emu esigma evs) = \s ->
+   let pdf :: Rational -> Rational -> Int -> Int -> Prob
+       pdf mu sigma n i = 1 / toRational n
+       dmu = evalE emu s
+       dsigma = evalE esigma s
+       dvs :: Dist [Value]
+       dvs = fmapDist
+               (\case { LS xs -> xs
+                      ; S xs -> DSET.toList xs
+                      ; _ -> error "unexpected type in DGassian" })
+               (evalE evs s)
+       dv :: Dist Value
+       dv = bindDist dmu (\case { R mu ->
+               bindDist dsigma (\case { R sigma ->
+                 bindDist dvs (\(vs :: [Value]) ->
+                   let vs' = zip vs [0..length vs-1]
+                       vs'' = map (second (pdf mu sigma (length vs))) vs'
+                   in D . M.fromListWith (+) $ vs''
+                 )
+               ; _ -> error "unexpected type of eps in DGaussian"
+               })
+             ; _ -> error "unexpected type of mu in DGaussian"
+             })
+    in dv
+evalE (DLaplaceDist eeps evs) = \s ->
+   let pdf :: Rational -> Int -> Int -> Prob
+       pdf eps n i = 1 / toRational n
+       deps = evalE eeps s
+       dvs :: Dist [Value]
+       dvs = fmapDist
+               (\case { LS xs -> xs
+                      ; S xs -> DSET.toList xs
+                      ; _ -> error "unexpected type of vs in DLaplace" })
+               (evalE evs s)
+       dv :: Dist Value
+       dv = bindDist deps (\case { R eps ->
+               bindDist dvs (\(vs :: [Value]) ->
+                 let vs' = zip vs [0..length vs-1]
+                     vs'' = map (second (pdf eps (length vs))) vs'
+                 in D . M.fromListWith (+) $ vs''
+               )
+            ; _ -> error "unexpected type of eps in DLaplace"
+            })
+    in dv
 evalE (Geometric alpha low start high) =
          let alphaV = evalTList $ alpha
              lowV = round (evalTList $ low)
@@ -591,9 +640,9 @@ evalE (ListLength list) = \s ->
 --evalE (TupleExpr list) = \s ->
 --         let hd = evalE (head list) s
 --             tl = evalE (TupleExpr (tail list)) s
---          in D $ fromListWith (+) resultList
+--          in D $  M.fromListWith (+) resultList
 evalE (TupleExpr list) = \s -> 
-        let runAll e = toList (runD ((evalE e) s))
+        let runAll e = M.toList (runD ((evalE e) s))
             distList = Data.List.map runAll list
             tmpDistToVal :: [(Value, Prob)] -> [Value]
             tmpDistToVal [] = []
@@ -659,14 +708,14 @@ evalNUList (INUchoices ls) =
      else \s ->
         let e1' = (evalE $ head ls) s
             e2' = (evalNUList $ INUchoices (tail ls)) s
-         in D $ unionWith (+) (runD e1') (runD e2')
+         in D $ M.unionWith (+) (runD e1') (runD e2')
 
 fromJustExpr :: Maybe Expr -> Expr
 fromJustExpr (Just a) = a
 fromJustExpr Nothing = error "Function not found."
 
-getCntxExpr :: String -> Map.Map String Expr -> Expr
-getCntxExpr id fCntx = fromJustExpr (Map.lookup id fCntx)
+getCntxExpr :: String -> Map String Expr -> Expr
+getCntxExpr id fCntx = fromJustExpr (M.lookup id fCntx)
 
 lValuesTolExpr :: [Value] -> [Expr]
 lValuesTolExpr [] = []

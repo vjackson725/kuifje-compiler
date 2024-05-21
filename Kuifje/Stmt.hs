@@ -217,6 +217,10 @@ recoverVars (ListExtend id1 id2) ls =
          in ls2
 recoverVars (SetIchoice e) ls = recoverVars e ls
 recoverVars (SetIchoiceDist e) ls = recoverVars e ls
+recoverVars (DGaussianDist emu esig e) ls =
+    recoverVars e . recoverVars esig . recoverVars emu $ ls
+recoverVars (DLaplaceDist eeps e) ls =
+    recoverVars e . recoverVars eeps $ ls
 recoverVars (TupleExpr _) ls = ls
 recoverVars (Geometric _ _ _ _) ls = ls
 
@@ -342,6 +346,10 @@ updateExpression fName (RBinary op e1 e2) =
      in (RBinary op newe1 newe2)
 updateExpression fName (SetIchoiceDist e) = let newExpr = (updateExpression fName e)
                                              in (SetIchoiceDist newExpr)
+updateExpression fName (DGaussianDist emu esig e) =
+    DGaussianDist (updateExpression fName emu) (updateExpression fName esig) (updateExpression fName e)
+updateExpression fName (DLaplaceDist eeps e) =
+    DLaplaceDist (updateExpression fName eeps) (updateExpression fName e)
 updateExpression fName (SetIchoice e) = let newExpr = (updateExpression fName e)
                                          in (SetIchoice newExpr) 
 updateExpression fName e = e

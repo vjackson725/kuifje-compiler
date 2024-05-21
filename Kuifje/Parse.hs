@@ -61,6 +61,8 @@ languageDef =
                                       , "observe"
                                       , "uniform"
                                       , "geometric"
+                                      , "dgaussian"
+                                      , "dlaplace"
                                       , "|"
                                       , "function"
                                       , "return"
@@ -456,6 +458,8 @@ eTermR = (parens expression
         <|> (try uniformSetVar                    <?> "eTerm:uniformSetVar")
         <|> (try uniformIchoicesListComp          <?> "eTerm:uniformIchoicesListComp")
         <|> (try notUniformIchoices               <?> "eTerm:notUniformIchoices")
+        <|> (dgaussianOnList                                                    )
+        <|> (dlaplaceOnList                                                     )
         <|> (geometricIchoices                    <?> "eTerm:geometricIchoices")
         <|> (liftM RationalConst (try decimalRat) <?> "eTerm:rat")
         <|> (liftM Var variable                   <?> "eTerm:var")
@@ -607,6 +611,24 @@ callExpr =
            parameters <- sepBy expression (symbol ",")
            reservedOp ")" 
            return $ CallExpr name parameters
+
+-- Discrete gaussian
+dgaussianOnList =
+   do
+      reserved "dgaussian"
+      mu <- expression
+      sigma <- expression
+      vals <- expression
+      return $ DGaussianDist mu sigma vals
+
+-- Discrete Laplace
+dlaplaceOnList =
+   do
+      reserved "dlaplace"
+      eps <- expression
+      vals <- expression
+      return $ DLaplaceDist eps vals
+
 
 -- Output only
 parseString :: String -> Stmt
