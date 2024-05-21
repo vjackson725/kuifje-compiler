@@ -191,7 +191,7 @@ ifStmt =
      ref <- indentationBlock -- expected column indentation for the block
      reserved "if"
      econd <- expression
-     reservedOp ":"
+     symbol ":"
      whiteSpace -- eat the space to the next token
      curr <- indentation
      unless (isLessLine ref curr) (fail "if requires a new line")
@@ -205,7 +205,7 @@ ifStmtElse :: Internal.Indentation -> Parser Stmt
 ifStmtElse ref =
   (do reserved "elif"
       econd <- expression
-      reservedOp ":"
+      symbol ":"
       whiteSpace -- eat the space to the next token
       curr <- indentation
       unless (isLessLine ref curr) (fail "elif requires a new line")
@@ -214,7 +214,7 @@ ifStmtElse ref =
       stmtElse <- ifStmtElse ref
       return $ If econd (collapsedSeq stmtsElif) stmtElse) <|>
   (do reserved "else"
-      reservedOp ":"
+      symbol ":"
       whiteSpace
       curr <- indentation
       unless (isLessLine ref curr) (fail "else requires a new line")
@@ -282,7 +282,7 @@ funcStmt =
      reserved "def"
      name <- fnname
      inputs <- parens (sepBy variable (symbol ","))
-     reservedOp ":"
+     symbol ":"
      body <- codeBlock ref
      -- Output Parameters - Only in the end of the function:
      input <- getInput
@@ -298,7 +298,7 @@ whileStmt =
      ref <- indentationBlock -- expected column indentation for the block
      reserved "while"
      cond <- expression
-     reservedOp ":"
+     symbol ":"
      whiteSpace -- eat the space to the next token
      curr <- indentation -- actual indentation at the start of the block
      unless (isLessLine ref curr) (fail "while expects a new line")
@@ -314,7 +314,7 @@ forStmt =
      var <- variable
      reserved "in"
      elist <- expression
-     reservedOp ":"
+     symbol ":"
      whiteSpace -- eat the space to the next token
      curr <- indentation -- actual indentation at the start of the block
      unless (isLessLine ref curr) (fail "for expects a new line")
@@ -478,24 +478,24 @@ ifExpr =
 
 uniformIchoices = 
   (do reserved "uniform"
-      reservedOp "["
+      symbol "["
       list <- sepBy expression (symbol ",")
-      reservedOp "]"
+      symbol "]"
       return $ IchoicesDist list) <?> "uniform choice from list"
 
 notUniformIchoices = 
-  (do reservedOp "["
+  (do symbol "["
       list <- sepBy expression (symbol ",")
-      reservedOp "]"
+      symbol "]"
       return $ INUchoicesDist list) <?> "non-uniform choice from list"
 
 uniformIchoicesListComp = 
   (do reserved "uniform"
-      reservedOp "["
+      symbol "["
       l <- integer
       symbol ".."
       r <- integer
-      reservedOp "]"
+      symbol "]"
       return $ IchoicesDist [(RationalConst (x % 1)) | x <- [l..r]]
   ) <?> "uniform choice from range"
 
@@ -539,16 +539,16 @@ tupleExpr =
            return $ TupleExpr ([exp] ++ list)
 
 listExpr =
-  (do reservedOp "["
+  (do symbol "["
       elements <- sepBy expression (symbol ",")
-      reservedOp "]"
+      symbol "]"
       return $ ListExpr elements) <?> "list expression"
 
 listElExpr =
   (do varID <- variable
-      reservedOp "["
+      symbol "["
       varIndex <- expression
-      reservedOp "]"
+      symbol "]"
       return $ ListElem varID varIndex) <?> "list indexing expression"
 
 listAppend =
