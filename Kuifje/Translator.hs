@@ -52,8 +52,8 @@ frt4 :: (a, b, c, d) -> d
 frt4 (_, _, _, x) = x
 
 recoverListLength :: Expr -> Expr
-recoverListLength (Var idList) = (ListLength (Var idList))
-recoverListLength (ListExpr list) = (RationalConst (toRational (length list)))
+recoverListLength (Var idList) = ListLength (Var idList)
+recoverListLength (ListExpr list) = DoubleConst (realToFrac (length list))
 
 recoverListID :: Expr -> Expr -> Expr
 recoverListID (Var idList) index = (ListElem idList index)
@@ -91,12 +91,12 @@ translateExecKuifje (Assign id expr) fBody fCntx list = recoverAsgn expr (Assign
 -- Support Statements
 translateExecKuifje (Plusplus id) fBody fCntx list = 
         let var = (Var id)
-            one = (RationalConst 1)
+            one = (DoubleConst 1)
             expr = (ABinary Add var one)
          in recoverAsgn expr (Assign id expr) fBody fCntx list
 translateExecKuifje (Lessless id) fBody fCntx list = 
         let var = (Var id)
-            one = (RationalConst 1)
+            one = (DoubleConst 1)
             expr = (ABinary Subtract var one)
          in recoverAsgn expr (Assign id expr) fBody fCntx list
 translateExecKuifje (Support id (Var idexp)) fBody fCntx list = 
@@ -145,9 +145,9 @@ translateExecKuifje (For index ls body) fBody fCntx list =
         let iteratorID = "iterator." ++ index
             listLen = recoverListLength ls--(ListLength (Var idList))
 
-            preCond = concatMonadValues list (A iteratorID (RationalConst (0 % 1)))
+            preCond = concatMonadValues list (A iteratorID (DoubleConst 0))
             cond = (RBinary Lt (Var iteratorID) listLen)
-            postCond = (ABinary Add (Var iteratorID) (RationalConst (1 % 1)))
+            postCond = (ABinary Add (Var iteratorID) (DoubleConst 1))
             
             --element = (ListElem idList (Var iteratorID))
             element = recoverListID ls (Var iteratorID)
@@ -183,14 +183,14 @@ translateExecKuifje (Sampling id exprD) fBody fCntx list =
 -- Default Value - Case a Statement is not found
 translateExecKuifje stmt _ _ list = error ("Invalid Statement:\n" ++ (show stmt) ++ "\nList:\n" ++ (monadType list))
 
-project :: Dist (Dist Gamma) -> Dist (Dist Rational)
-project = fmapDist (fmapDist (\s -> getRational s "y"))
+project :: Dist (Dist Gamma) -> Dist (Dist Double)
+project = fmapDist (fmapDist (\s -> getDouble s "y"))
 
-initGamma :: Rational -> Rational -> Gamma
+initGamma :: Double -> Double -> Gamma
 initGamma x y = let g = E.add E.empty ("x", (R x)) in 
                E.add g ("y", (R y))
 
-hyper :: Dist (Dist Rational)
+hyper :: Dist (Dist Double)
 hyper = let g = createMonnad (fst3 (translateExecKuifje exampelS Map.empty Map.empty (L [])))
          in project $ hysem g (uniform [E.empty])
 
@@ -200,6 +200,6 @@ example = "y := 0; while (x > 0) do y := x + y; x := x - 1; od;"
 exampelS :: Stmt
 exampelS = let (Seq ls) = parseString example 
             in Seq $ (Assign "x" (Ichoice
-                        (RationalConst (5 % 1)) 
-                        (RationalConst (6 % 1)) 
-                        (RationalConst (1 % 2)) )):ls
+                        (DoubleConst 5.0)
+                        (DoubleConst 6.0) 
+                        (DoubleConst 0.5))) : ls

@@ -9,7 +9,7 @@ import Data.Set
 import Data.List
 
 data Type = BoolType
-          | RationalType
+          | DoubleType
           | SetOf Type
           deriving (Show, Eq, Read)
 
@@ -49,14 +49,14 @@ typeCheck g (Assign s e)
 typeCheck g (If e stmt1 stmt2) = 
         case exprCheck g e of 
           (TC (Left err)) -> typeError err
-          (TC (Right RationalType)) -> typeError TypeMismatch
+          (TC (Right DoubleType)) -> typeError TypeMismatch
           (TC (Right BoolType)) -> do (g1, stmt1') <- typeCheck g stmt1
                                       (g2, stmt2') <- typeCheck g stmt2
                                       return (g1, (If e stmt1 stmt2))
 typeCheck g (While e stmt) = 
         case exprCheck g e of 
           (TC (Left err)) -> typeError err
-          (TC (Right RationalType)) -> typeError TypeMismatch
+          (TC (Right DoubleType)) -> typeError TypeMismatch
           (TC (Right BoolType)) -> do (g', stmt) <- typeCheck g stmt 
                                       return (g', (While e stmt))
 typeCheck g Skip = return (g, Skip)
@@ -69,7 +69,7 @@ typeCheck g (Echoice stmt1 stmt2 e) =
         case exprCheck g e of 
           (TC (Right BoolType))     -> typeError TypeMismatch
           (TC (Left er))            -> typeError er
-          (TC (Right RationalType)) -> 
+          (TC (Right DoubleType)) -> 
                   do (g1, stmt1') <- typeCheck g stmt1
                      (g2, stmt2') <- typeCheck g stmt2
                      if g1 == g2 
@@ -79,23 +79,23 @@ typeCheck g (Echoice stmt1 stmt2 e) =
 exprCheck :: Gamma -> Expr -> TC Type
 exprCheck g (Var s) | Just t <- E.lookup g s = return t
                     | otherwise = typeError $ NoSuchVariable s
-exprCheck g (RationalConst _) = return RationalType
+exprCheck g (DoubleConst _) = return DoubleType
 exprCheck g (Neg e) = 
         do x <- exprCheck g e 
            case x of 
              BoolType     -> return BoolType 
-             RationalType -> typeError TypeMismatch
+             DoubleType -> typeError TypeMismatch
 exprCheck g (ABinary _ e1 e2) = 
         do e1' <- exprCheck g e1 
            e2' <- exprCheck g e2 
-           if e1' == e2' && e1' == RationalType 
-              then return RationalType 
+           if e1' == e2' && e1' == DoubleType 
+              then return DoubleType 
               else typeError TypeMismatch
 exprCheck g (Ichoice e1 e2 e3) = 
         do e1' <- exprCheck g e1 
            e2' <- exprCheck g e2 
            e3' <- exprCheck g e3
-           if e1' == e2' && e3' == RationalType
+           if e1' == e2' && e3' == DoubleType
               then return e1'
               else typeError TypeMismatch
 exprCheck g (Ichoices ls) = 
@@ -123,7 +123,7 @@ exprCheck g (BBinary _ e1 e2) =
 exprCheck g (RBinary _ e1 e2) = 
         do e1' <- exprCheck g e1 
            e2' <- exprCheck g e2 
-           if e1' == e2' && e1' == RationalType
+           if e1' == e2' && e1' == DoubleType
               then return BoolType
               else typeError TypeMismatch
 exprCheck g (ExprIf c e1 e2) = 
@@ -143,6 +143,6 @@ exprCheck g (Eset s) =
 exprCheck g (Case val e1) =
         do val'  <- exprCheck val c
            e1' <- exprCheck g e1
-           if val' != typeError && e1' == RationalType
+           if val' != typeError && e1' == DoubleType
               then return e1'
               else typeError TypeMismatch

@@ -29,7 +29,7 @@ import System.IO
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
 
-valuesToExprList :: [(Value, Rational)] -> [Expr]
+valuesToExprList :: [(Value, Double)] -> [Expr]
 valuesToExprList [] = []
 valuesToExprList ls =
         let hd = head ls
@@ -45,7 +45,7 @@ getSupportList ls =
             tl = getSupportList (tail ls)
          in newHd ++ tl
 
-getSupportDist :: [((Dist Value), Rational)] -> [(Expr, Rational)]
+getSupportDist :: [((Dist Value), Double)] -> [(Expr, Double)]
 getSupportDist [] = []
 getSupportDist ls =
         let hd = head ls
@@ -58,16 +58,16 @@ getSupportDist ls =
             then ((head exp), prob) : tl
             else (newExp, prob) : tl
 
-getSupportFromHyper :: Dist (Dist Value) -> [(Expr, Rational)]
+getSupportFromHyper :: Dist (Dist Value) -> [(Expr, Double)]
 getSupportFromHyper d =
         let mp = unpackD d
          in getSupportDist (assocs mp)
 
-recoverSupportAsDistList :: [(Expr, Rational)] -> [Expr]
+recoverSupportAsDistList :: [(Expr, Double)] -> [Expr]
 recoverSupportAsDistList [] = []
 recoverSupportAsDistList ls = 
         let (e, r) = (head ls)
-            p = (RationalConst r) 
+            p = (DoubleConst r) 
             tp = (Tuple e p)
             tl = recoverSupportAsDistList (tail ls)
           in tp : tl
@@ -138,7 +138,7 @@ createMonnad (E s1 s2 p) =
 
 recoverVars :: Expr -> [String] -> [String]
 recoverVars (Var id) ls = ([id] ++ ls)
-recoverVars (RationalConst _) ls = ls
+recoverVars (DoubleConst _) ls = ls
 recoverVars (Text _) ls = ls
 recoverVars (IchoicesDist list) ls = 
         if length list == 1
@@ -398,7 +398,7 @@ getFuncBody id funcBody = fromJust (Map.lookup id funcBody)
 --evalCaseStmt :: Stmt -> Expr
 --evalCaseStmt (CaseStmt exp stmt) = exp
 
-getRational :: Gamma -> String -> Rational
-getRational g s | Just (R t) <- E.lookup g s = t
+getDouble :: Gamma -> String -> Double
+getDouble g s | Just (R t) <- E.lookup g s = t
                 | otherwise = error ("Not going to happen " ++ s)
 

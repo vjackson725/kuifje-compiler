@@ -31,8 +31,8 @@ convertToTupleStr (TP x) =
    in newStr
 
 instance Boxable (Value) where
-  toBox (R x) = text "R" <+> text (show $ fromRat x)
-  toBox (T x) = text "T" <+> text (show $ x)
+  toBox (R x) = text "R" <+> text (show x)
+  toBox (T x) = text "T" <+> text (show x)
   toBox (B x) = text "B" <+> text (show x)
   toBox (S x) = text "S" <+> (toBox $ S.elems x)
   toBox (PD x) = text "PD" <+> (toBox $ S.elems x)

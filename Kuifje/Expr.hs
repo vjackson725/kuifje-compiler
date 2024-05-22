@@ -8,7 +8,8 @@
 module Kuifje.Expr where 
 
 import qualified Kuifje.Env as E
-import Kuifje.Value
+import qualified Kuifje.Value as Value
+import Kuifje.Value (Value(..), Gamma)
 import Kuifje.Parse
 import Kuifje.Syntax 
 
@@ -23,6 +24,7 @@ import Data.Semigroup
 import qualified Data.Set as DSET
 import Numeric
 import System.IO
+import Text.Printf (printf)
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
 
@@ -42,32 +44,23 @@ aOperatorWarpper op (R x) (R y) =
           Multiply -> R $ (*) x y
           Divide   -> R $ (/) x y
           Pow      -> R $ x *^* y 
-          IDivide  -> R $ (div (truncate x) (truncate y)) % 1
-          Rem      -> R $ (rem (truncate x) (truncate y)) % 1
+          IDivide  -> R $ realToFrac (div (floor x) (floor y))
+          Rem      -> R $ realToFrac (rem (floor x) (floor y))
 
 aOperatorWarpper op (T x) (S y) =
-        case op of
-          Filter    -> S $ DSET.filter (\n -> if (isText n)
-                                              then let (T v) = n
-                                                    in isSubsequenceOf x v
-                                              else False) y
-          otherwise -> error "Unknow set operation"
+  case op of
+    Filter -> S $ DSET.filter (\v -> Value.isText v && isSubsequenceOf x (Value.theText v)) y
+    otherwise -> error "Unknow set operation"
 
 aOperatorWarpper op (R x) (S y) =
-        case op of
-          Filter    -> S $ DSET.filter (\n -> if (isRational n)
-                                              then let (R v) = n
-                                                    in (x == v)
-                                              else False) y
-          otherwise -> error "Unknow set operation"
+  case op of
+    Filter    -> S $ DSET.filter (\v -> Value.isRat v && Value.theRat v == x) y
+    otherwise -> error "Unknow set operation"
 
 aOperatorWarpper op (B x) (S y) =
-        case op of
-          Filter    -> S $ DSET.filter (\n -> if (isBool n)
-                                              then let (B v) = n
-                                                    in (x == v)
-                                              else False) y
-          otherwise -> error "Unknow set operation"
+  case op of
+    Filter    -> S $ DSET.filter (\v -> Value.isBool v && Value.theBool v == x) y
+    otherwise -> error "Unknow set operation"
 
 aOperatorWarpper op (S x) (S y) = 
         case op of 
@@ -75,10 +68,7 @@ aOperatorWarpper op (S x) (S y) =
           Subtract -> let el = x DSET.\\ y
                        in S $ el
           Intersection -> S $ DSET.intersection x y
-          Filter    -> S $ DSET.filter (\n -> if (isSet n)
-                                              then let (S v) = n
-                                                    in DSET.isSubsetOf x v
-                                              else False) y
+          Filter    -> S $ DSET.filter (\case { S v -> DSET.isSubsetOf x v ; _ -> False }) y
           otherwise -> error "Unknow set operation"
 
 aOperatorWarpper op a b = error ("Unknow operation " ++ (show op) ++ " <> " ++ (show a) ++ " <> " ++ (show b))
@@ -99,7 +89,11 @@ cOperatorWarpper Eq (T x) (T y) = ((isInfixOf x y) && (isInfixOf y x))
 cOperatorWarpper Ne (T x) (T y) = (not ((isInfixOf x y) && (isInfixOf y x)))
 
 cOperatorWarpper op v1 v2 =
-  error ("Operator: " ++ show op ++ " not found for " ++ valuePrettyType v1 ++ " vs. " ++ valuePrettyType v2)
+  error (printf
+    "Operator: %s not found for %s vs. %s"
+    (show op)
+    (Value.valuePrettyType v1)
+    (Value.valuePrettyType v2))
 
 cOperator op d1 d2 =
   D $ M.fromListWith (+) [((B (cOperatorWarpper op x y)), p * q) | (x, p) <- M.toList $ runD d1,
@@ -209,10 +203,6 @@ removeElemFromList ls el False = let hd = head ls
                                      else ([hd] ++ (removeElemFromList tl el False))
 removeElemFromList ls _ True = ls
 
-lenghtFromList :: [Value] -> Integer
-lenghtFromList [] = 0
-lenghtFromList ls = (1 + (lenghtFromList (tail ls)))
-
 exprToValue2Cntx :: Expr -> (Dist Value) -> (Dist Value) -> Value
 exprToValue2Cntx (ListExtend id list) ev1 ev2 = 
   let ls1 = fst (head (M.assocs (unpackD ev1)))
@@ -225,18 +215,16 @@ exprToValue2Cntx (ListElem lsid index) ev1 ev2 =
   let ls = fst (head (M.assocs (unpackD ev1)))
       ind = fst (head (M.assocs (unpackD ev2)))
       elems = extractFromListTy ls
-   in if (isRational ind)
-      then let (R id) = ind
-            in recoverElemFromList elems (numerator id)
-      else error ("Out of range access index in list: " ++ (show lsid)) 
+   in case ind of
+        R id -> recoverElemFromList elems (floor id)
+        _ -> error (printf "Out of range access of %s in list %s" (show ind) (show ls))
 exprToValue2Cntx (ListElemDirect list index) ev1 ev2 =
   let ls = fst (head (M.assocs (unpackD ev1)))
       ind = fst (head (M.assocs (unpackD ev2)))
       elems = extractFromListTy ls
-   in if (isRational ind)
-      then let (R id) = ind
-            in recoverElemFromList elems (numerator id)
-      else error ("Out of range access index in list: " ++ (show list))
+   in case ind of
+        R id -> recoverElemFromList elems (floor id)
+        _ -> error (printf "Out of range access of %s in list %s" (show ind) (show ls))
 exprToValue2Cntx (ListAppend id elem) ev1 ev2 =
   let ls = fst (head (M.assocs (unpackD ev1)))
       el = fst (head (M.assocs (unpackD ev2)))
@@ -248,11 +236,9 @@ exprToValue2Cntx (ListInsert id index elem) ev1 ev2 =
       el = fst (head (M.assocs (unpackD ev2)))
       elems = extractFromListTy ls
       id = exprToValue index ev1
-   in if (isRational id)
-         then let (R ind) = id
-                  newL = insertElemIntoList elems el (numerator ind)
-               in (LS newL)
-         else error ("Invalid index" ++ (show index))
+   in case id of
+        R ind -> LS $ insertElemIntoList elems el (floor ind)
+        _ -> error ("Invalid index " ++ show index)
 
 
 exprToValue :: Expr -> (Dist Value) -> Value
@@ -261,12 +247,12 @@ exprToValue :: Expr -> (Dist Value) -> Value
                            --in if ((length vals) == 1)
                            --   then (snd (head (vals)))
                            --   else (PD (DSET.fromDistinctAscList vals))
-exprToValue (RationalConst r) _ = (R r)
+exprToValue (DoubleConst r) _ = (R r)
 exprToValue (Text t) _ = (T t)
-exprToValue (Neg a) ev = exprToValue (ABinary Multiply (RationalConst (-1 % 1)) a) ev
+exprToValue (Neg a) ev = exprToValue (ABinary Multiply (DoubleConst (-1)) a) ev
 exprToValue (BoolConst b) _ = (B b)
-exprToValue (ABinary Multiply (RationalConst a) (RationalConst b)) _ = (R (a * b))
-exprToValue (ABinary Divide (RationalConst a) (RationalConst b)) _ = (R (a / b))
+exprToValue (ABinary Multiply (DoubleConst a) (DoubleConst b)) _ = (R (a * b))
+exprToValue (ABinary Divide (DoubleConst a) (DoubleConst b)) _ = (R (a / b))
 exprToValue (Eset ns) ev = 
    let e = DSET.elems ns
        l = lExprTolValues e ev
@@ -287,11 +273,11 @@ exprToValue (ListInsert id index elem) ev =
       elems = extractFromListTy ls
       el = exprToValue elem ev
       id = exprToValue index ev
-   in if (isRational id)
-         then let (R ind) = id
-                  newL = insertElemIntoList elems el (numerator ind)
-               in (LS newL)
-         else error ("Invalid index" ++ (show index))
+   in case id of
+        R ind ->
+            let newL = insertElemIntoList elems el (floor ind)
+            in (LS newL)
+        _ -> error ("Invalid index" ++ (show index))
 exprToValue (ListRemove id elem) ev =
   let ls = fst (head (M.assocs (unpackD ev)))
       elems = extractFromListTy ls
@@ -301,8 +287,8 @@ exprToValue (ListRemove id elem) ev =
 exprToValue (ListLength list) ev =
   let ls = fst (head (M.assocs (unpackD ev)))
       elems = extractFromListTy ls
-      r = lenghtFromList elems
-   in (R (r % 1))
+      r = realToFrac $ length elems
+   in (R r)
 exprToValue (TupleExpr ls) ev =
   let l = lExprTolValues ls ev
    in (TP l)
@@ -322,7 +308,7 @@ createDistList prob ls ev = let hd = exprToValue (head ls) ev
                              in [(prob, hd)] ++ tl
 
 convertTuple :: Expr -> (Prob, Value)
-convertTuple (Tuple e p) = let ev = (evalE (RationalConst (0 % 1))) E.empty
+convertTuple (Tuple e p) = let ev = (evalE (DoubleConst 0)) E.empty
                                val = exprToValue e ev
                                (R pr) = exprToValue p ev
                             in (pr, val)
@@ -363,7 +349,7 @@ sampleFromDistList ls = let hd = sampleFromDist (head ls)
 sampleFromDist :: Expr -> Expr
 -- Primitive Values
 sampleFromDist (Var id) = (Var id)
-sampleFromDist (RationalConst r) = (RationalConst r) 
+sampleFromDist (DoubleConst r) = (DoubleConst r) 
 sampleFromDist (Text t) = (Text t)
 sampleFromDist (Neg r) = (Neg r)
 sampleFromDist (BoolConst b) = (BoolConst b)
@@ -427,7 +413,7 @@ evalE :: Expr -> (Gamma ~> Value)
 evalE (Var id) = \s -> case E.lookup s id of 
                           Just v -> returnDist v
                           otherwise -> error ("Variable " ++ id ++ " not in scope")
-evalE (RationalConst r) = \s -> returnDist (R r)
+evalE (DoubleConst r) = \s -> returnDist (R r)
 evalE (Text t) = \s -> returnDist (T t)
 evalE (Neg r) = \s -> 
         let r' = (evalE r) s in 
@@ -457,7 +443,7 @@ evalE (Ichoice e1 e2 p) = \s ->
       d2 = D $ M.map (*(1-p')) $ runD e2'
    in D $  M.unionWith (+) (runD d1) (runD d2)
 evalE (IchoiceDist e1 e2 p) = \s ->
-  let dw = fmapDist theRational $ evalE p s
+  let dw = fmapDist Value.theRat $ evalE p s
    in bindDist dw (joinDist . bernoulli (evalE e1 s) (evalE e2 s))
 evalE (Ichoices ls) = 
    if length ls == 1 
@@ -465,10 +451,10 @@ evalE (Ichoices ls) =
       else evalE $ Ichoice 
                           (head ls) 
                           (Ichoices (tail ls)) 
-                          (RationalConst (1 % (toInteger (length ls))))
+                          (DoubleConst (1 / realToFrac (length ls)))
 evalE (IchoicesDist ls) = \s -> 
-   let ev = (evalE (Ichoices ls)) s
-       p = (1 % (toInteger (length ls)))
+   let ev = evalE (Ichoices ls) s
+       p = 1 / realToFrac (length ls)
        vals = createDistList p ls ev
        dist = (PD (DSET.fromDistinctAscList vals))
     in returnDist dist
@@ -528,20 +514,20 @@ evalE (Eset set) = \s ->
          in D $  M.fromListWith (+) resultList
 evalE (SetIchoice e) = \s -> 
         let d = (evalE e) s 
-            resultList = concat [[(elem, p/(toInteger (DSET.size set) % 1)) 
+            resultList = concat [[(elem, p / (realToFrac (DSET.size set))) 
                                         | elem <- DSET.toList set] 
                                         | (S set, p) <- M.toList (runD d)]
          in D $  M.fromListWith (+) resultList
 evalE (SetIchoiceDist e) = \s -> 
         let d = (evalE e) s
-            resultList = concat [[(p/(toInteger (DSET.size set) % 1), elem)
+            resultList = concat [[(p / (realToFrac (DSET.size set)), elem)
                                         | elem <- DSET.toList set]
                                         | (S set, p) <- M.toList (runD d)]
             dist = (PD (DSET.fromDistinctAscList resultList))
          in returnDist dist
 evalE (DGaussianDist emu esigma evs) = \s ->
-   let pdf :: Rational -> Rational -> Int -> Int -> Prob
-       pdf mu sigma n i = 1 / toRational n
+   let pdf :: Double -> Double -> Int -> Int -> Prob
+       pdf mu sigma n i = 1 / realToFrac n
        dmu = evalE emu s
        dsigma = evalE esigma s
        dvs :: Dist [Value]
@@ -564,8 +550,8 @@ evalE (DGaussianDist emu esigma evs) = \s ->
              })
     in dv
 evalE (DLaplaceDist eeps evs) = \s ->
-   let pdf :: Rational -> Int -> Int -> Prob
-       pdf eps n i = 1 / toRational n
+   let pdf :: Double -> Int -> Int -> Prob
+       pdf eps n i = 1 / realToFrac n
        deps = evalE eeps s
        dvs :: Dist [Value]
        dvs = fmapDist
@@ -661,22 +647,19 @@ evalE (TupleExpr list) = \s ->
             linearList = to1DList valList
          in returnDist (TP linearList)
 
-buildDist :: [Integer] -> [Rational] -> [Expr]
+buildDist :: [Integer] -> [Double] -> [Expr]
 buildDist [] [] = []
-buildDist values probs = 
-         let value = head values
-             prob = head probs
-             tl = buildDist (tail values) (tail probs)
-          in (Tuple (RationalConst (value % 1)) (RationalConst prob)) : tl
+buildDist (v : vs) (p : ps) = 
+   (Tuple (DoubleConst (realToFrac v)) (DoubleConst p)) : buildDist vs ps
 
-calcLimitGeom :: Double -> Integer -> Integer -> Rational
+calcLimitGeom :: Double -> Integer -> Integer -> Double
 calcLimitGeom alpha start bound = realToFrac ((1 / (1 + alpha)) * (alpha^(abs (bound - start))))
 
-calcGeom :: Double -> Integer -> Integer -> Rational
+calcGeom :: Double -> Integer -> Integer -> Double
 calcGeom alpha start n = realToFrac (((1 - alpha) / (1 + alpha)) * (alpha^(abs (n - start))))
 
 evalTList :: Expr -> Double
-evalTList (RationalConst a) = (fromRat a)
+evalTList (DoubleConst a) = a
 evalTList (Neg a) = -1 * (evalTList a)
 evalTList (ABinary Divide a b) = 
   let aVal = (evalTList $ a)
@@ -695,7 +678,7 @@ evalTList (INUchoicesDist ls) =
   in hd + tl
 
 recoverIChoicesValues :: Expr -> [Expr]
-recoverIChoicesValues (RationalConst x) = [(RationalConst x)]
+recoverIChoicesValues (DoubleConst x) = [(DoubleConst x)]
 recoverIChoicesValues (Ichoice v1 v2 _) =
   let hd = (recoverIChoicesValues v1)
       tl = (recoverIChoicesValues v2)
@@ -725,7 +708,7 @@ lValuesTolExpr ls =
          in hd : tl
 
 valueToExpr :: Value -> Expr
-valueToExpr (R r) = (RationalConst r)
+valueToExpr (R r) = (DoubleConst r)
 valueToExpr (T t) = (Text t)
 valueToExpr (B b) = (BoolConst b)
 valueToExpr (S s) =

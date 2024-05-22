@@ -42,9 +42,9 @@ recoverSetElements ls = let hd = recoverValues (head ls)
                             else hd
 
 recoverValues :: Value -> String
-recoverValues (R x) = "R " ++ (show (fromRat x))
+recoverValues (R x) = "R " ++ show x
 recoverValues (T x) = "T " ++ x
-recoverValues (B x) = "B " ++ (boolToString x)
+recoverValues (B x) = "B " ++ boolToString x
 recoverValues (S x) = let list = S.elems x
                        in "S [" ++ recoverSetElements list ++ "]"
 
@@ -57,7 +57,7 @@ recoverD2FromList :: Integer -> [(Value, Prob)] -> String
 recoverD2FromList s [] = ""
 recoverD2FromList s ls = let (v, p) = (head ls)
                              val = "\"" ++ (recoverValues v) ++ "\""
-                             prob = "\"" ++ (show (fromRat p)) ++ "\""
+                             prob = "\"" ++ (show p) ++ "\""
                              tl = recoverD2FromList s (tail ls)
                           in if tl /= "" 
                              then (spaceGen s) ++ val ++ ":" ++ prob ++ ",\n" ++ tl
@@ -73,7 +73,7 @@ recoverD1FromList s id ls = let ((D hdl), p) = (head ls)
                                 h2 = h1 ++ (spaceGen (s + 4)) ++ "\"type\":\"Inner\",\n"
                                 h3 = h2 ++ hd ++ "\n" ++ (spaceGen s) ++ "}"
                                 p1 = (spaceGen (s + 4)) ++ "\"world " ++ (show id) ++ "\":"
-                                p2 = p1 ++ "\"" ++ (show (fromRat p)) ++ "\""
+                                p2 = p1 ++ "\"" ++ show p ++ "\""
                              in if tl /= ""
                                 then ((h3 ++ ",\n" ++ tl), (p2 ++ ",\n" ++ tlp))
                                 else (h3, p2)
@@ -174,7 +174,7 @@ convertListToString ls = let hd = "\"" ++ (head ls) ++ "\""
 
 convertProbListToString :: [Prob] -> String
 convertProbListToString [] = ""
-convertProbListToString ls = let hd = "\"" ++ (show (fromRat (head ls))) ++ "\""
+convertProbListToString ls = let hd = "\"" ++ (show (head ls)) ++ "\""
                                  tl = convertProbListToString (tail ls)
                               in if tl /= ""
                                  then hd ++ ", " ++ tl

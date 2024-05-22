@@ -12,11 +12,11 @@ import Language.Kuifje.Distribution
 import Text.ParserCombinators.Parsec.Expr
 
 valueToString :: Value -> String
-valueToString (R x) = show (fromRat x)
+valueToString (R x) = show x
 valueToString (B x) = if x then "TRUE" else "FALSE"
 valueToString (T x) = x
 
-data Value = R Rational 
+data Value = R Double 
            | B Bool 
            | T String
            | PD (S.Set (Prob, Value))
@@ -37,9 +37,9 @@ isBool :: Value -> Bool
 isBool (B _) = True
 isBool _ = False
 
-isRational :: Value -> Bool
-isRational (R _) = True
-isRational _ = False
+isRat :: Value -> Bool
+isRat (R _) = True
+isRat _ = False
 
 theText :: Value -> String
 theText (T s) = s
@@ -50,13 +50,13 @@ theSet (S s) = s
 theBool :: Value -> Bool
 theBool (B b) = b
 
-theRational :: Value -> Rational
-theRational (R x) = x
+theRat :: Value -> Double
+theRat (R x) = x
 
 valuePrettyType :: Value -> String
 valuePrettyType = vpt
   where
-    vpt (R _) = "Rational"
+    vpt (R _) = "Rat"
     vpt (B _) = "Bool"
     vpt (T _) = "String"
     vpt (S s) = "Set<" ++ prettyManyTypes (S.toList . S.map vpt $ s) ++ ">"

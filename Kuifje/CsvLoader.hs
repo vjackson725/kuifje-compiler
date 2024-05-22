@@ -1,4 +1,7 @@
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
+
 module Kuifje.CsvLoader where
 
 import System.Environment
@@ -43,15 +46,15 @@ convertExprLsToText ls = let hd = exprToStr (head ls)
                              tl = convertExprLsToText (tail ls)
                           in (hd ++ tl)
                              
-isStrRational :: String -> Bool
-isStrRational "" = True
-isStrRational s = let hd = head s
+isStrDouble :: String -> Bool
+isStrDouble "" = True
+isStrDouble s = let hd = head s
                    in if ((Ch.isDigit hd) || (hd == '.'))
-                      then (isStrRational (tail s))
+                      then (isStrDouble (tail s))
                       else False
 
-convertStrToRational :: String -> Rational
-convertStrToRational s = toRational (read s :: Float)
+convertStrToDouble :: String -> Double
+convertStrToDouble s = (read s :: Double)
 
 selectCols :: String -> Integer -> [Integer] -> [String] -> [Expr]
 selectCols _ _ [] [] = []
@@ -79,8 +82,8 @@ selectCols "Type" id cols val = let hdCols = head cols
                                       tlCols = tail cols
                                       tlVal = tail val
                                       tl = selectCols "Type" (id+1) tlCols tlVal
-                                   in if (isStrRational hdVal)
-                                      then ((RationalConst (convertStrToRational hdVal)) : tl)
+                                   in if (isStrDouble hdVal)
+                                      then ((DoubleConst (convertStrToDouble hdVal)) : tl)
                                       else ((Text hdVal) : tl)
                              else (selectCols "Type" (id+1) cols (tail val))
 
@@ -123,12 +126,12 @@ lExprTolValues ls =
          in hd : tl
 
 exprToValue :: Expr -> Value
-exprToValue (RationalConst r) = (R r)
+exprToValue (DoubleConst r) = (R r)
 exprToValue (Text t) = (T t)
-exprToValue (Neg a) = exprToValue (ABinary Multiply (RationalConst (-1 % 1)) a)
+exprToValue (Neg a) = exprToValue (ABinary Multiply (DoubleConst (-1)) a)
 exprToValue (BoolConst b) = (B b)
-exprToValue (ABinary Multiply (RationalConst a) (RationalConst b)) = (R (a * b))
-exprToValue (ABinary Divide (RationalConst a) (RationalConst b)) = (R (a / b))
+exprToValue (ABinary Multiply (DoubleConst a) (DoubleConst b)) = (R (a * b))
+exprToValue (ABinary Divide (DoubleConst a) (DoubleConst b)) = (R (a / b))
 exprToValue (Eset ns) =
    let e = S.elems ns
        l = lExprTolValues e
@@ -164,11 +167,7 @@ readMap id m = let mVal = M.lookup id m
                 in convertMaybe mVal
 
 listToInteger :: [Expr] -> [Integer]
-listToInteger [] = []
-listToInteger ls = let (RationalConst r) = (head ls)
-                       hd = numerator r
-                       tl = listToInteger (tail ls)
-                    in hd : tl
+listToInteger = map (\case (DoubleConst r) -> floor r)
 
 exprToNumber :: Expr -> (M.Map String Expr) -> [Integer]
 exprToNumber (Var id) m = let (Eset expr) = readMap id m
@@ -176,16 +175,17 @@ exprToNumber (Var id) m = let (Eset expr) = readMap id m
                            in (listToInteger list)
 
 loadCSVs :: String -> Stmt -> (M.Map String Expr) -> (IO (Stmt, (M.Map String Expr)))
-loadCSVs fName (Csv identifier file columns limit tVal) m = do let csvName = addPathtoFile fName (exprToStr file)
-                                                               fl <- readFile csvName 
-                                                               let rows = lines fl
-                                                               let cols = exprToNumber columns m
-                                                               let tpy = exprToStr tVal
-                                                               let exprs = createExpressions tpy 1 cols rows
-                                                               let (RationalConst r) = limit
-                                                               let l = numerator r
-                                                               let newExprs = limitList l exprs
-                                                               Prelude.return ((Assign identifier (IchoicesDist newExprs)),m)
+loadCSVs fName (Csv identifier file columns limit tVal) m =
+  do let csvName = addPathtoFile fName (exprToStr file)
+     fl <- readFile csvName 
+     let rows = lines fl
+     let cols = exprToNumber columns m
+     let tpy = exprToStr tVal
+     let exprs = createExpressions tpy 1 cols rows
+     let (DoubleConst r) = limit
+     let l = floor r
+     let newExprs = limitList l exprs
+     Prelude.return ((Assign identifier (IchoicesDist newExprs)),m)
 loadCSVs fName (Assign id expr) m = do putStr ""
                                        let newM = M.insert id expr m
                                        Prelude.return ((Assign id expr),newM)

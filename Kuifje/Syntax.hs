@@ -30,11 +30,11 @@ data RBinOp = Gt
             deriving (Show, Ord, Eq)
 
 data ExprTy = EBool 
-            | ERational 
+            | EDouble 
             deriving (Show)
 
 data Expr = Var String 
-          | RationalConst Rational
+          | DoubleConst Double
           | Neg Expr
           | Text String
           | ABinary ABinOp Expr Expr 

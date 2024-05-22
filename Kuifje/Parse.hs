@@ -130,13 +130,13 @@ stringSymbol =
       reserved "\""
       return text) <?> "string"
 
-decimalRat :: Parser Rational
+decimalRat :: Parser Double
 decimalRat = 
   (do ns <- many1 digit
       ms <- try (char '.' >> many digit) <|> return [] 
       let pow10 = toInteger $ length ms
       let (Right n) = parse natural "" (ns ++ ms)
-      return (n % (10 ^ pow10))) <?> "number"
+      return (realToFrac n / (10 ^ pow10))) <?> "number"
 
 kChoice :: (a -> a -> Expr -> a) -> Parser (a -> a -> a)
 kChoice c =
@@ -182,7 +182,7 @@ sTerm = (    (try plusplusStmt  <?> "sTerm:plusplus")
 
 checkIndent :: Expr -> Internal.Indentation -> Internal.Indentation -> Bool
 checkIndent expr ref pos = 
-   if expr == (RBinary Ne (RationalConst (1 % 1)) (RationalConst (1 % 1)))
+   if expr == (RBinary Ne (DoubleConst 1) (DoubleConst 1))
       then False
       else (isInBlock ref pos) 
 
@@ -461,7 +461,7 @@ eTermR = (parens expression
         <|> (dgaussianOnList                                                    )
         <|> (dlaplaceOnList                                                     )
         <|> (geometricIchoices                    <?> "eTerm:geometricIchoices")
-        <|> (liftM RationalConst (try decimalRat) <?> "eTerm:rat")
+        <|> (liftM DoubleConst (try decimalRat) <?> "eTerm:rat")
         <|> (liftM Var variable                   <?> "eTerm:var")
         <|> (liftM Text stringLiteral             <?> "eTerm:text")
         <?> "eTerm") << whiteSpace
@@ -500,7 +500,7 @@ uniformIchoicesListComp =
       symbol ".."
       r <- integer
       symbol "]"
-      return $ IchoicesDist [(RationalConst (x % 1)) | x <- [l..r]]
+      return $ IchoicesDist [(DoubleConst (realToFrac x)) | x <- [l..r]]
   ) <?> "uniform choice from range"
 
 uniformFromSet = 
@@ -603,7 +603,7 @@ listRange =
            symbol ","
            r <- integer
            symbol ")"
-           return $ ListExpr [(RationalConst (x % 1)) | x <- [l..r]]
+           return $ ListExpr [(DoubleConst (realToFrac x)) | x <- [l..r]]
 
 callExpr =
         do name <- fnname
