@@ -14,12 +14,14 @@ import Kuifje.CsvLoader
 import Kuifje.Env (Env)
 import qualified Kuifje.Env as E
 
+import Data.Bifunctor
 import Data.IORef
 import Data.List
 import Data.Ratio ((%))
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import qualified Data.Map as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as S
 import System.Environment
 import System.IO 
@@ -114,18 +116,40 @@ runFileDefaultParams s param =
 uniformEpsilonTable :: String -> String -> String -> String -> IO ()
 uniformEpsilonTable file invar outvar svals =
   do
-    let vals :: [Int]
-        vals = read svals
+    let vals :: [Rational]
+        vals =  map ((% 1) . toInteger) $ read svals
         envin :: Dist Gamma
-        envin = D.uniform (map (E.singleton invar . R . (% 1) . toInteger) vals)
+        envin = D.uniform (map (E.singleton invar . R) vals)
     hyper <- runFile file envin
     let f :: Hyper Gamma -> [String]
         f = M.foldMapWithKey (\k _ -> M.foldMapWithKey (\k _ -> E.allVar k) . D.runD $ k) . D.runD
         allvars :: [String]
         allvars = nub . sort . f $ hyper
-    let epss = [realToFrac x / 10.0 | x <- [0..10]]
-        out :: Hyper Gamma
-        out = projectVars (S.fromList [invar,outvar]) hyper
+        epss :: [Double]
+        epss = [realToFrac x / 10.0 | x <- [0..10]]
+        reducedH :: Hyper Gamma
+        reducedH = projectVars (S.fromList [invar,outvar]) hyper
+        -- | assumes all dists are non-empty, and outvar always exists
+        conditioned :: [(Rational, Dist (Dist Value))]
+        conditioned = map (\x -> (x, D.fmapDist (D.conditionMaybeDist (condPred x)) reducedH)) vals
+          where
+            condPred :: Rational -> Gamma -> Maybe Value
+            condPred x env =
+              case E.lookup env invar of
+                Just x' | x' == R x -> Just $ Maybe.fromJust (E.lookup env outvar)
+                otherwise -> Nothing
+        -- scores :: Dist (M.Map String Float)
+        -- scores = D.fmapDist (\d ->  (\m -> ) $ D.runD d) hyper'
     writeDecimalPrecision 6 -- set the decimal precision to output
-    printBox . toBox $ out
+    putStrLn "Reduced hyper:"
+    printBox . toBox $ reducedH
+    putStrLn ""
+    putStrLn "Conditioned hypers:"
+    mapM_
+      (\(x, h) ->
+        do
+          putStrLn (invar ++ " == " ++ show x)
+          printBox . toBox $ h
+      )
+      conditioned
 
