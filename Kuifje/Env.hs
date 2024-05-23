@@ -1,14 +1,17 @@
 {-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable, GeneralizedNewtypeDeriving #-}
 module Kuifje.Env ( Env(..)
                  , empty
+                 , singleton
                  , lookup
                  , add
                  , addAll
                  , allVar
                  , envFromList
+                 , restrictVars
                  ) where
 
 import qualified Data.Map as M
+import qualified Data.Set as S
 import Data.Foldable (Foldable)
 import Data.Traversable (Traversable)
 import Data.Monoid
@@ -19,6 +22,9 @@ newtype Env e = Env (M.Map String e)
 
 empty :: Env e
 empty = Env M.empty
+
+singleton :: String -> e -> Env e
+singleton x e = Env (M.singleton x e)
 
 lookup :: Env e -> String -> Maybe e
 lookup (Env env) var = M.lookup var env
@@ -37,3 +43,6 @@ allVar (Env env) = [ s | (s, _) <- M.toList env]
 
 envFromList :: [(String,e)] -> Env e
 envFromList xs = Env (M.fromList xs)
+
+restrictVars :: S.Set String -> Env e -> Env e
+restrictVars ks (Env m) = Env $ M.restrictKeys m ks

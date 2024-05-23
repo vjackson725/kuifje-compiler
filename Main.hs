@@ -2,20 +2,25 @@ module Main where
 
 import Control.Applicative (empty)
 import Control.Monad (when)
+import Data.List (isPrefixOf)
 
 import System.Environment
 import Kuifje.Run
 
+main :: IO ()
 main =
   do
     args <- getArgs
-    if null args
-    then putStrLn "provide a file"
-    else 
-      let file = head args
-          flags = tail args
-       in runFileDefaultParams file flags
---           in do runHyper file flags
---          case args of
---            [file]    -> do runHyper file
---            otherwise -> error "Please provide a file."
+    case args of
+      [] ->
+        putStrLn "please provide a file"
+      (mode : file : flags) | not . isPrefixOf "-" $ file ->
+        case mode of
+          "run" -> runFileDefaultParams file flags
+          "etable" | (invar:outvar:svals:_) <- flags ->
+                      uniformEpsilonTable file invar outvar svals
+                   | otherwise ->
+                      putStrLn "etable requires an input var, an output var, and a list of inputs"
+          _ -> putStrLn "provided an unknown compiler mode"
+      (file : flags) ->
+        runFileDefaultParams file flags
