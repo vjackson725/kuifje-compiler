@@ -131,13 +131,16 @@ uniformEpsilonTable file invar outvar svals =
         reducedH = projectVars (S.fromList [invar,outvar]) hyper
         -- | assumes all dists are non-empty, and outvar always exists
         conditioned :: [(Rational, Dist (Dist Value))]
-        conditioned = map (\x -> (x, D.fmapDist (D.conditionMaybeDist (condPred x)) reducedH)) vals
+        conditioned = map (\x -> (x, condition x reducedH)) vals
           where
             condPred :: Rational -> Gamma -> Maybe Value
             condPred x env =
               case E.lookup env invar of
                 Just x' | x' == R x -> Just $ Maybe.fromJust (E.lookup env outvar)
                 otherwise -> Nothing
+            condition x =
+              D.conditionMaybeDist (\d -> if D.null d then Nothing else Just d)
+              . D.fmapDist (D.conditionMaybeDist (condPred x)) 
         -- scores :: Dist (M.Map String Float)
         -- scores = D.fmapDist (\d ->  (\m -> ) $ D.runD d) hyper'
     writeDecimalPrecision 6 -- set the decimal precision to output
