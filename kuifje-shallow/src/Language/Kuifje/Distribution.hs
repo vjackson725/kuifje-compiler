@@ -87,14 +87,29 @@ probListToDist :: Ord a => ProbList a -> Dist a
 probListToDist = D . M.fromListWith (+) . unProbList
 
 
+-- | normalises a distribution
+normalise :: Dist a -> Dist a
+normalise (D m) =
+  let sum = M.foldr (+) 0 m
+  in D $ M.map (/ sum) m
+
+
 -- | fmap function for distributions.
 fmapDist :: (Ord b) => (a -> b) -> Dist a -> Dist b
 fmapDist f = probListToDist . fmap f . distToProbList
 
+-- | condition the Dist on a predicate
+filterDist :: (Ord a) => (a -> Bool) -> Dist a -> Dist a
+filterDist p = listToDist . filter (p . fst) .  distToList
+
 -- | mapMaybe function for distributions.
---   Note, does not renormalise the distribution.
+--   !NOTE! does not renormalise the distribution!
 mapMaybeDist :: (Ord b) => (a -> Maybe b) -> Dist a -> Dist b
 mapMaybeDist f = listToDist . mapMaybe (\(a,p) -> (,p) <$> f a) . distToList
+
+-- | Renomalising mapMaybe function for distributions.
+conditionMaybeDist :: (Ord b) => (a -> Maybe b) -> Dist a -> Dist b
+conditionMaybeDist f = normalise . listToDist . mapMaybe (\(a,p) -> (,p) <$> f a) . distToList
 
 -- | fmap function for distributions, where f is injective.
 --   Requires f is injective on all values in the domain of the Dist.
@@ -144,3 +159,8 @@ weight = M.foldr (+) 0 . runD
 -- | The bernoulli distribution between a and b, with weight w.
 bernoulli :: Ord a => a -> a -> Prob -> Dist a
 bernoulli a b w = D $ M.fromList [(a, w),(b, 1-w)]
+
+
+-- | The bernoulli distribution between a and b, with weight w.
+null :: Dist a -> Bool
+null = M.null . runD
