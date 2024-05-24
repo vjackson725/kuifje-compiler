@@ -24,8 +24,8 @@ import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as S
 import System.Environment
-import System.IO 
-import Text.PrettyPrint.Boxes (printBox)
+import System.IO
+import qualified Text.PrettyPrint.Boxes as PP
 import Text.Printf (printf)
 
 import Language.Kuifje.Distribution (Hyper, Dist, fmapDist, traverseDist)
@@ -38,8 +38,13 @@ import Language.Kuifje.ShallowConsts
 project :: String -> Dist (Dist Gamma) -> Dist (Dist Value)
 project var = fmapDist (D.mapMaybeDist (flip E.lookup var))
 
+-- | restrict every env in the hyper to contain only the variables in `vars`
 projectVars :: S.Set String -> Dist (Dist Gamma) -> Dist (Dist Gamma)
 projectVars vars = fmapDist (D.fmapDist (E.restrictVars vars))
+
+-- | restrict every env in the hyper to contain only the variables not in `vars`
+projectVarsCompl :: S.Set String -> Dist (Dist Gamma) -> Dist (Dist Gamma)
+projectVarsCompl vars = fmapDist (D.fmapDist (E.withoutVars vars))
 
 processFlag :: String -> String -> [(String, (Dist (Dist Value)))] -> IO ()
 processFlag "json1" fName values = createJson1 fName values
@@ -75,9 +80,9 @@ outputL ls =
   mapM_ (\l ->
     do
       putStrLn $ "> Variable " ++ fst l ++ " hyper"
-      printBox . toBox . snd $ l
+      PP.printBox . toBox . snd $ l
       putStrLn $ "> condEntropy bayesVuln " ++ fst l ++ " hyper"
-      printBox . toBox . condEntropy bayesVuln . snd $ l
+      PP.printBox . toBox . condEntropy bayesVuln . snd $ l
       putStrLn ""
   ) ls
 
@@ -113,46 +118,39 @@ runFileDefaultParams s param =
     writeDecimalPrecision 6
     outputL output
 
-uniformEpsilonTable :: String -> String -> String -> String -> IO ()
-uniformEpsilonTable file invar outvar svals =
+leakDists :: String -> String -> String -> IO ()
+leakDists file invar svals =
   do
     let vals :: [Rational]
         vals =  map ((% 1) . toInteger) $ read svals
-        envin :: Dist Gamma
-        envin = D.uniform (map (E.singleton invar . R) vals)
-    hyper <- runFile file envin
+        -- envin :: Dist Gamma
+        -- envin = D.uniform (map (E.singleton invar . R) vals)
+    hyper <- runFile file $ D.point E.empty
     let f :: Hyper Gamma -> [String]
         f = M.foldMapWithKey (\k _ -> M.foldMapWithKey (\k _ -> E.allVar k) . D.runD $ k) . D.runD
-        allvars :: [String]
-        allvars = nub . sort . f $ hyper
-        epss :: [Double]
-        epss = [realToFrac x / 10.0 | x <- [0..10]]
-        reducedH :: Hyper Gamma
-        reducedH = projectVars (S.fromList [invar,outvar]) hyper
-        -- | assumes all dists are non-empty, and outvar always exists
-        conditioned :: [(Rational, Dist (Dist Value))]
-        conditioned = map (\x -> (x, condition x reducedH)) vals
+        -- | condition the inners by the values `vals` that `invar` takes
+        conditioned :: [(Rational, Dist (Dist Gamma))]
+        conditioned = map (\x -> (x, condition x hyper)) vals
           where
-            condPred :: Rational -> Gamma -> Maybe Value
+            condPred :: Rational -> Gamma -> Maybe Gamma
             condPred x env =
               case E.lookup env invar of
-                Just x' | x' == R x -> Just $ Maybe.fromJust (E.lookup env outvar)
+                Just x' | x' == R x -> Just $ E.withoutVars (S.fromList [invar]) env
                 otherwise -> Nothing
+            condition :: Rational -> Hyper Gamma -> Hyper Gamma
             condition x =
               D.conditionMaybeDist (\d -> if D.null d then Nothing else Just d)
               . D.fmapDist (D.conditionMaybeDist (condPred x)) 
         -- scores :: Dist (M.Map String Float)
         -- scores = D.fmapDist (\d ->  (\m -> ) $ D.runD d) hyper'
     writeDecimalPrecision 6 -- set the decimal precision to output
-    putStrLn "Reduced hyper:"
-    printBox . toBox $ reducedH
-    putStrLn ""
     putStrLn "Conditioned hypers:"
     mapM_
       (\(x, h) ->
         do
           putStrLn (invar ++ " == " ++ show x)
-          printBox . toBox $ h
+          PP.printBox . ((PP.<+>) (PP.text "  ")) . toBox $ h
+          putStrLn ""
       )
       conditioned
 

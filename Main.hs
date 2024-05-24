@@ -17,10 +17,10 @@ main =
       (mode : file : flags) | not . isPrefixOf "-" $ file ->
         case mode of
           "run" -> runFileDefaultParams file flags
-          "etable" | (invar:outvar:svals:_) <- flags ->
-                      uniformEpsilonTable file invar outvar svals
+          "ldists" | (invar:svals:_) <- flags ->
+                      leakDists file invar svals
                    | otherwise ->
-                      putStrLn "etable requires an input var, an output var, and a list of inputs"
+                      putStrLn "ldists requires an input var and a list of input values"
           _ -> putStrLn "provided an unknown compiler mode"
       (file : flags) ->
         runFileDefaultParams file flags

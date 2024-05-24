@@ -8,6 +8,7 @@ module Kuifje.Env ( Env(..)
                  , allVar
                  , envFromList
                  , restrictVars
+                 , withoutVars
                  ) where
 
 import qualified Data.Map as M
@@ -46,3 +47,6 @@ envFromList xs = Env (M.fromList xs)
 
 restrictVars :: S.Set String -> Env e -> Env e
 restrictVars ks (Env m) = Env $ M.restrictKeys m ks
+
+withoutVars :: S.Set String -> Env e -> Env e
+withoutVars ks (Env m) = Env $ M.withoutKeys m ks
