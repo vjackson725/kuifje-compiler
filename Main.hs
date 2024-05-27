@@ -21,10 +21,10 @@ main =
                       leakDists file invar svals
                    | otherwise ->
                       putStrLn "ldists requires an input var and a list of input values"
-          "etable" | (invar:svals:_) <- flags ->
-                      epsTable file invar svals
+          "etable" | (invar:svals:outvar:_) <- flags ->
+                      epsTable file invar svals outvar
                    | otherwise ->
-                      putStrLn "etable requires an input var and a list of input values"
+                      putStrLn "etable requires an input var, a list of input values, and an outvar"
           _ -> putStrLn "provided an unknown compiler mode"
       (file : flags) ->
         runFileDefaultParams file flags

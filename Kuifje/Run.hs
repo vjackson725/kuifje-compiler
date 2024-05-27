@@ -145,8 +145,6 @@ leakDists file invar svals =
             condition x =
               D.conditionMaybeDist (\d -> if D.null d then Nothing else Just d)
               . D.fmapDist (D.conditionMaybeDist (condPred x)) 
-        -- scores :: Dist (M.Map String Float)
-        -- scores = D.fmapDist (\d ->  (\m -> ) $ D.runD d) hyper'
     writeDecimalPrecision 6 -- set the decimal precision to output
     putStrLn "Conditioned hypers:"
     mapM_
@@ -159,18 +157,16 @@ leakDists file invar svals =
       conditioned
 
 
-epsTable :: String -> String -> String -> IO ()
-epsTable file invar svals =
+epsTable :: String -> String -> String -> String -> IO ()
+epsTable file invar svals outvar =
   do
     let vals :: [Rational]
         vals =  map ((% 1) . toInteger) $ read svals
-        -- envin :: Dist Gamma
-        -- envin = D.uniform (map (E.singleton invar . R) vals)
     hyper <- runFile file $ D.point E.empty
     let f :: Hyper Gamma -> [String]
         f = M.foldMapWithKey (\k _ -> M.foldMapWithKey (\k _ -> E.allVar k) . D.runD $ k) . D.runD
         -- | condition the inners by the values `vals` that `invar` takes
-        conditioned :: Map Rational (Hyper Gamma)
+        conditioned :: Map Rational (Dist (S.Set Gamma))
         conditioned = M.fromList $ map (\x -> (x, condition x hyper)) vals
           where
             condPred :: Rational -> Gamma -> Maybe Gamma
@@ -178,12 +174,13 @@ epsTable file invar svals =
               case E.lookup env invar of
                 Just x' | x' == R x -> Just $ E.withoutVars (S.fromList [invar]) env
                 otherwise -> Nothing
-            condition :: Rational -> Hyper Gamma -> Hyper Gamma
+            condition :: Rational -> Hyper Gamma -> Dist (S.Set Gamma)
             condition x =
-              D.conditionMaybeDist (\d -> if D.null d then Nothing else Just d)
-              . D.fmapDist (D.conditionMaybeDist (condPred x)) 
-        -- scores :: Dist (M.Map String Float)
-        -- scores = D.fmapDist (\d ->  (\m -> ) $ D.runD d) hyper'
+              D.conditionMaybeDist (\d -> if S.null d then Nothing else Just d)
+              . D.fmapDist (S.map (E.restrictVars (S.fromList [outvar])) .
+                              M.keysSet .
+                              D.runD .
+                              D.conditionMaybeDist (condPred x))
         ematrix :: Map (Rational, Rational) _
         ematrix = M.fromList [((x,y), bestEps x y) | x <- vals, y <- vals, x /= y ]
           where
@@ -192,18 +189,29 @@ epsTable file invar svals =
               let mx = D.runD . Maybe.fromJust $ M.lookup x conditioned -- exists by construction
                   my = D.runD . Maybe.fromJust $ M.lookup y conditioned -- exists by construction
               in
-                -- M.foldr
-                --   (\a b -> case (a,b) of { (Just x, Just y) -> Just (max x y) ; _ -> Nothing })
-                --   (Just 0) $
-                M.merge
-                  (M.mapMissing (\_ p -> if p == 0 then Just 0 else Nothing)) -- p <= e^eps * 0
-                  (M.mapMissing (\_ q -> Just 0)) -- 0 <= e^eps * q
-                  (M.zipWithMatched (\_ p q -> Just . log . realToFrac $ p / q)) -- p <= e^eps * q
-                  mx
-                  my
+                (map snd . M.toList $
+                  M.merge
+                    (M.mapMaybeMissing (\_ p -> if p == 0 then Just 0 else Nothing)) -- p <= e^eps * 0
+                    (M.mapMissing (\_ q -> 0)) -- 0 <= e^eps * q
+                    (M.zipWithMatched (\_ p q -> log . realToFrac $ p / q)) -- p <= e^eps * q
+                    mx
+                    my
+                , S.null (M.keysSet mx `S.difference` M.keysSet my)
+                  && S.null (M.keysSet mx `S.difference` M.keysSet my)
+                )
     writeDecimalPrecision 6 -- set the decimal precision to output
+    putStrLn "Conditioned hypers:"
+    mapM_
+      (\(x, h) ->
+        do
+          putStrLn (invar ++ " == " ++ show x)
+          PP.printBox . (PP.<+>) (PP.text "  ") . prettyMap (prettySet toBox) toBox . D.runD $ h
+          putStrLn ""
+      )
+      (M.toList conditioned)
     putStrLn "ε-table:"
     PP.printBox $
+      (PP.<+>) (PP.text "  ") .
         PP.vcat PP.left .
-        map (\(k,v) -> PP.text (show k) PP.<+> PP.text (show v)) $
+        map (\(k,(v,c)) -> PP.text (show k) PP.<+> PP.text (show v) PP.<> PP.text "," PP.<+> PP.text "complete:" PP.<+> PP.text (show c)) $
         (M.toList ematrix)
