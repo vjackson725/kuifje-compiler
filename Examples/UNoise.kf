@@ -1,0 +1,6 @@
+
+x <- uniform [1,2,3]
+k <- uniform [-1,0,1]
+y = x + k
+
+leak(y)
