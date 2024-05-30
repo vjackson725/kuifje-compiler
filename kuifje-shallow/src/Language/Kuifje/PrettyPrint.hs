@@ -6,6 +6,7 @@ module Language.Kuifje.PrettyPrint where
 
 import Data.List (transpose, intersperse)
 import qualified Data.Map.Strict as HM
+import qualified Data.Set as S
 import Debug.Trace
 import Text.Printf (printf)
 
@@ -28,6 +29,9 @@ instance Boxable Integer where
 
 instance Boxable Int where
   toBox = PP.text . show
+
+instance Boxable Double where
+  toBox = PP.text . printf ("%." ++ show decimalPrecision ++ "f")
 
 rationalPrettyFormat =
   if decimalPrecision < 0
@@ -77,3 +81,23 @@ tabulate rs = table
    rs'      = transpose $ zipWith (\c w -> map (PP.alignHoriz PP.left w) c) columns widths
    columns' = map (PP.hsep 3 PP.top) rs'
    table    = PP.vsep 0 PP.left columns'
+
+
+prettyMap :: (k -> PP.Box) -> (v -> PP.Box) -> HM.Map k v -> PP.Box
+prettyMap f g m =
+  let (ks, vs) = unzip . HM.toList $ m
+  in PP.hsep
+      2
+      PP.left
+      [ PP.vcat PP.left $ map f ks
+      , PP.vcat PP.left $ map g vs
+      ]
+
+prettySet :: (a -> PP.Box) -> S.Set a -> PP.Box
+prettySet f s =
+  let vs = map f $ S.toList s
+  in PP.text "{" PP.<+> boxmiddle vs PP.<+> PP.text "}"
+  where
+    boxmiddle ([b]) = b
+    boxmiddle (b : bs) = b PP.<> PP.text "," PP.<+> boxmiddle bs
+    boxmiddle [] = PP.text ""
