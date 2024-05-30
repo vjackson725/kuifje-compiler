@@ -618,16 +618,24 @@ callExpr =
            reservedOp ")" 
            return $ CallExpr name parameters
 
+-- | Parse a program. Will fail if it doesn't reach the eof
+kuifjeProg :: Parser Stmt
+kuifjeProg =
+   ((indentation >>= codeBlock) <<
+      whiteSpace <<
+      eof) <?> "program"
+
+
 -- Output only
 parseString :: String -> Stmt
 parseString str =
-        case parse (indentation >>= codeBlock) "" str of
+        case parse kuifjeProg "" str of
           Left e  -> error $ show e
           Right r -> r
 
 parseFile :: String -> IO Stmt
 parseFile file =
         do program  <- readFile file
-           case parse (indentation >>= codeBlock) "" program of
+           case parse kuifjeProg "" program of
                 Left e  -> print e >> fail "parse error"
                 Right r -> return r
