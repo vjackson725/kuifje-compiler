@@ -14,6 +14,7 @@ import Kuifje.CsvLoader
 import Kuifje.Env (Env)
 import qualified Kuifje.Env as E
 
+import Control.Monad (when)
 import Data.Bifunctor
 import Data.IORef
 import Data.List
@@ -109,11 +110,12 @@ runFileDefaultParams :: String -> [String] -> IO ()
 runFileDefaultParams s param =
   do
     hyper <- runFile s (D.uniform [E.empty])
-    let f :: Hyper Gamma -> [String]
-        f = M.foldMapWithKey (\k _ -> M.foldMapWithKey (\k _ -> E.allVar k) . D.runD $ k) . D.runD
+    let getVars :: Hyper Gamma -> [String]
+        getVars = M.foldMapWithKey (\k _ -> M.foldMapWithKey (\k _ -> E.allVar k) . D.runD $ k) . D.runD
         allvars :: [String]
-        allvars = nub . sort . f $ hyper
+        allvars = nub . sort . getVars $ hyper
     let output = [(x, project x hyper) | x <- allvars]
+    when (null output) (fail "no variables in output hyper")
     readFlags param s output
     writeDecimalPrecision 6
     outputL output
@@ -123,12 +125,8 @@ leakDists file invar svals =
   do
     let vals :: [Rational]
         vals =  map ((% 1) . toInteger) $ read svals
-        -- envin :: Dist Gamma
-        -- envin = D.uniform (map (E.singleton invar . R) vals)
     hyper <- runFile file $ D.point E.empty
-    let f :: Hyper Gamma -> [String]
-        f = M.foldMapWithKey (\k _ -> M.foldMapWithKey (\k _ -> E.allVar k) . D.runD $ k) . D.runD
-        -- | condition the inners by the values `vals` that `invar` takes
+    let -- | condition the inners by the values `vals` that `invar` takes
         conditioned :: [(Rational, Dist (Dist Gamma))]
         conditioned = map (\x -> (x, condition x hyper)) vals
           where
@@ -141,8 +139,6 @@ leakDists file invar svals =
             condition x =
               D.conditionMaybeDist (\d -> if D.null d then Nothing else Just d)
               . D.fmapDist (D.conditionMaybeDist (condPred x)) 
-        -- scores :: Dist (M.Map String Float)
-        -- scores = D.fmapDist (\d ->  (\m -> ) $ D.runD d) hyper'
     writeDecimalPrecision 6 -- set the decimal precision to output
     putStrLn "Conditioned hypers:"
     mapM_
