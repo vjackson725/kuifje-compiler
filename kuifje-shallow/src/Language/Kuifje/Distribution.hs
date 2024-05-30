@@ -91,7 +91,7 @@ probListToDist = D . M.fromListWith (+) . unProbList
 normalise :: Dist a -> Dist a
 normalise (D m) =
   let sum = M.foldr (+) 0 m
-  in D $ M.map (/ sum) m
+  in if sum /= 1 then D $ M.map (/ sum) m else D m
 
 
 -- | fmap function for distributions.
@@ -125,9 +125,13 @@ returnDist x = D $ M.singleton x 1
 point :: Ord a => a -> Dist a
 point = returnDist
 
+-- | Alias for return function.
+empty :: Ord a => Dist a
+empty = D $ M.empty
+
 -- | Top-level bind function for distributions.
 bindDist :: (Ord b) => Dist a -> (a -> Dist b) -> Dist b
-bindDist d f = probListToDist $ (>>=) (distToProbList d) (distToProbList . f)
+bindDist d f = normalise $ probListToDist $ (>>=) (distToProbList d) (distToProbList . f)
 
 -- | Top-level join function for distributions.
 joinDist :: (Ord a) => Dist (Dist a) -> Dist a

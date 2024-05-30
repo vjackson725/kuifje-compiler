@@ -99,7 +99,7 @@ assumesem f ds =
         dbs = ds =>> (\x -> D.fmapDist (,x) (f x))
         ds' :: Dist s
         ds' = D.conditionMaybeDist (\(b,s) -> if b then Just s else Nothing) dbs
-    in D.point ds'
+    in if not (D.null ds') then D.point ds' else D.empty
 
 -- | Calculate Bayes Vulnerability for a distribution.
 bayesVuln :: Ord a => Dist a -> Prob
