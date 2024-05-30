@@ -99,4 +99,5 @@ data Stmt = Seq [Stmt]
           | Leak Expr
           | Vis String
           | Echoice Stmt Stmt Expr
+          | Assume Expr
 deriving instance Show Stmt

@@ -66,6 +66,7 @@ languageDef =
                                       , "return"
                                       , "csv"
                                       , "for"
+                                      , "assume"
                                       ]
             , Token.reservedOpNames = ["+"
                                       , "-"
@@ -176,6 +177,7 @@ sTerm = (    (try plusplusStmt  <?> "sTerm:plusplus")
          <|> (skipStmt          <?> "sTerm:skip")
          <|> (vidStmt           <?> "sTerm:vid")
          <|> (leakStmt          <?> "sTerm:leak")
+         <|> (assumeStmt        <?> "sTerm:assume")
          <|> (assignStmt        <?> "sTerm:assign"))
 
 checkIndent :: Expr -> Internal.Indentation -> Internal.Indentation -> Bool
@@ -372,6 +374,14 @@ leakStmt =
      expr <- expression
      reservedOp ")"
      return $ Leak expr
+
+assumeStmt :: Parser Stmt
+assumeStmt = 
+  do reserved "assume"
+     reservedOp "("
+     expr <- expression
+     reservedOp ")"
+     return $ Assume expr
 
 readStmt :: Parser Stmt
 readStmt =

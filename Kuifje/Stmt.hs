@@ -1,13 +1,13 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
-module Kuifje.Stmt where 
+module Kuifje.Stmt where
 
 import qualified Kuifje.Env as E
 import qualified Data.Map as Map
 import Kuifje.Value
 import Kuifje.Parse
-import Kuifje.Syntax 
+import Kuifje.Syntax
 import Kuifje.Expr
 
 import Control.Lens hiding (Profunctor)
@@ -19,13 +19,14 @@ import qualified Data.Set as DSET
 import Numeric
 
 import Language.Kuifje.Distribution
---import Kuifje.PrettyPrint 
-import Language.Kuifje.PrettyPrint 
+--import Kuifje.PrettyPrint
+import Language.Kuifje.PrettyPrint
 import Language.Kuifje.Semantics
-import Language.Kuifje.Syntax
+import Language.Kuifje.Syntax (Kuifje)
+import qualified Language.Kuifje.Syntax as KS
 import Control.Applicative
 
-import System.IO 
+import System.IO
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
 
@@ -39,9 +40,9 @@ valuesToExprList ls =
 
 getSupportList :: [(Dist Value)] -> [Expr]
 getSupportList [] = []
-getSupportList ls = 
+getSupportList ls =
         let hd = assocs (unpackD (head ls))
-            newHd = valuesToExprList hd 
+            newHd = valuesToExprList hd
             tl = getSupportList (tail ls)
          in newHd ++ tl
 
@@ -65,9 +66,9 @@ getSupportFromHyper d =
 
 recoverSupportAsDistList :: [(Expr, Rational)] -> [Expr]
 recoverSupportAsDistList [] = []
-recoverSupportAsDistList ls = 
+recoverSupportAsDistList ls =
         let (e, r) = (head ls)
-            p = (RationalConst r) 
+            p = (RationalConst r)
             tp = (Tuple e p)
             tl = recoverSupportAsDistList (tail ls)
           in tp : tl
@@ -85,18 +86,20 @@ data MonadValue = M (Kuifje Gamma)
            | C Expr MonadValue MonadValue
            | E MonadValue MonadValue Expr
            | W Expr MonadValue
+           | Assm Expr
   deriving (Show)
 
 monadType :: MonadValue -> String
 monadType (A id e) = ("\nAssign: " ++ id ++ " =>> " ++ (show e))
 monadType (M md) = ("\nM: Monad")
 monadType (O e) = ("\nO: Observe")
+monadType (Assm e) = ("\nAssm: Assume")
 monadType (L []) = ""
-monadType (L ls) = 
+monadType (L ls) =
      let hd = monadType (head ls)
          tl = monadType (L (tail ls))
       in ("\n[" ++ hd ++ " <> "++ tl ++ "]")
-monadType (C e t f) = ("\nC: \n  T = " ++ (monadType t) ++ "\n  F = " ++ (monadType f)) 
+monadType (C e t f) = ("\nC: \n  T = " ++ (monadType t) ++ "\n  F = " ++ (monadType f))
 monadType (E t f p) = ("\nE: \n  T = " ++ (monadType t) ++ "\n  F = " ++ (monadType f))
 monadType (W e b) = ("\nW: \n  B = " ++ (monadType b))
 
@@ -108,49 +111,50 @@ concatMonadValues v1 v2 = (L ([v1] ++ [v2]))
 
 createMonnad :: MonadValue -> Kuifje Gamma
 createMonnad (M m) = m
-createMonnad (O e) = observe (evalE e)
-createMonnad (A id expr) = 
-        Language.Kuifje.Syntax.update (\s -> 
-          let currS = (evalE expr) s
-           in fmapDist (\r -> E.add s (id, r)) currS)
-createMonnad (L []) = skip
+createMonnad (O e) = KS.observe (evalE e)
+createMonnad (A id expr) =
+  KS.update (\s ->
+    let currS = (evalE expr) s
+    in fmapDist (\r -> E.add s (id, r)) currS)
+createMonnad (L []) = KS.skip
 createMonnad (L ls) = createMonnad (head ls) <> createMonnad (L (tail ls))
 createMonnad (W e body) =
-        Language.Kuifje.Syntax.while
-            (fmapDist theBool . evalE e)
-            (createMonnad body)
+  KS.while
+    (fmapDist theBool . evalE e)
+    (createMonnad body)
 createMonnad (C e s1 s2) =
-        Language.Kuifje.Syntax.cond 
-          (fmapDist theBool . evalE e)
-          (createMonnad s1)
-          (createMonnad s2)
-          --
-          -- Leaks the conditional after evaluation, that is, branches are
-          -- equivalent to
-          --   (observe (fmapDist theBool . evalE e) <> createMonnad s1) 
-          --   (observe (fmapDist theBool . evalE e) <> createMonnad s2)
+  KS.cond
+    (fmapDist theBool . evalE e)
+    (createMonnad s1)
+    (createMonnad s2)
+  --
+  -- Leaks the conditional after evaluation, that is, branches are
+  -- equivalent to
+  --   (observe (fmapDist theBool . evalE e) <> createMonnad s1)
+  --   (observe (fmapDist theBool . evalE e) <> createMonnad s2)
 createMonnad (E s1 s2 p) =
-        Language.Kuifje.Syntax.cond
-          (\s -> let p' = (evalE (Ichoice (BoolConst True) (BoolConst False) p) s)
-                  in fmapDist theBool p')
-          (createMonnad s1)
-          (createMonnad s2)
+  KS.cond
+    (\s -> let p' = (evalE (Ichoice (BoolConst True) (BoolConst False) p) s)
+            in fmapDist theBool p')
+    (createMonnad s1)
+    (createMonnad s2)
+createMonnad (Assm e) = KS.assume (fmapDist theBool . evalE e)
 
 recoverVars :: Expr -> [String] -> [String]
 recoverVars (Var id) ls = ([id] ++ ls)
 recoverVars (RationalConst _) ls = ls
 recoverVars (Text _) ls = ls
-recoverVars (IchoicesDist list) ls = 
+recoverVars (IchoicesDist list) ls =
         if length list == 1
            then recoverVars (head list) ls
            else (recoverVars (head list) ls) ++ (recoverVars (Ichoices (tail list)) ls)
-recoverVars (IchoiceDist e1 e2 _) ls = 
+recoverVars (IchoiceDist e1 e2 _) ls =
         let ls1 = recoverVars e1 ls
             ls2 = recoverVars e2 ls1
          in ls2
 recoverVars (PowerSet _) ls = ls
 recoverVars (Neg r) ls = recoverVars r ls
-recoverVars (ExprIf cond e1 e2) ls = 
+recoverVars (ExprIf cond e1 e2) ls =
         let ls1 = recoverVars cond ls
             ls2 = recoverVars e1 ls1
             ls3 = recoverVars e2 ls2
@@ -163,7 +167,7 @@ recoverVars (Ichoice e1 e2 _) ls =
         let ls1 = recoverVars e1 ls
             ls2 = recoverVars e2 ls1
          in ls2
-recoverVars (Ichoices list) ls = 
+recoverVars (Ichoices list) ls =
         if length list == 1
            then recoverVars (head list) ls
            else (recoverVars (head list) ls) ++ (recoverVars (Ichoices (tail list)) ls)
@@ -192,14 +196,14 @@ recoverVars (RBinary _ e1 e2) ls =
          in ls2
 recoverVars (Eset _) ls = ls
 recoverVars (ListExpr _) ls = ls
-recoverVars (ListElem id index) ls = 
+recoverVars (ListElem id index) ls =
         let ls1 = recoverVars (Var id) ls
             ls2 = recoverVars index ls1
          in ls2
 recoverVars (ListElemDirect _ index) ls =
         let ls1 = recoverVars index ls
          in ls1
-recoverVars (ListAppend id _) ls = 
+recoverVars (ListAppend id _) ls =
         let ls1 = recoverVars (Var id) ls
          in ls1
 recoverVars (ListInsert id _ _) ls =
@@ -235,9 +239,9 @@ getReturnExpr e = error ("Invalid Return Expression " ++ (show e))
 findReturns :: [Stmt] -> [Expr]
 -- Skip if no returns were found
 findReturns [] = []
-findReturns fBody = 
+findReturns fBody =
            let hd = (head fBody)
-               tl = findReturns (tail fBody) 
+               tl = findReturns (tail fBody)
            in if (isReturnStmt hd)
               then [(getReturnExpr hd)] ++ tl
               else tl
@@ -246,7 +250,7 @@ addInputCntx :: String -> [String] -> [Expr] -> Stmt -> Stmt
 addInputCntx fName [] [] stmt = stmt
 addInputCntx fName [] _  stmt = error ("Invalid Call to " ++ fName)
 addInputCntx fName _  [] stmt = error ("Invalid Call to " ++ fName)
-addInputCntx fName fInputs cInputs stmt = 
+addInputCntx fName fInputs cInputs stmt =
         let id = (fName ++ "." ++ (head fInputs))
             expr = (head cInputs)
             nAssngStmt = (Assign id expr)
@@ -343,7 +347,7 @@ updateExpression fName (RBinary op e1 e2) =
 updateExpression fName (SetIchoiceDist e) = let newExpr = (updateExpression fName e)
                                              in (SetIchoiceDist newExpr)
 updateExpression fName (SetIchoice e) = let newExpr = (updateExpression fName e)
-                                         in (SetIchoice newExpr) 
+                                         in (SetIchoice newExpr)
 updateExpression fName e = e
 
 
@@ -358,11 +362,11 @@ updateStmtUses fName (Seq ls) =
          tl = (updateStmtUses fName (Seq (tail ls)))
          (Seq list) = tl
      in (Seq (hd : list))
-updateStmtUses fName (Assign id expr) = 
+updateStmtUses fName (Assign id expr) =
      let newexpr = (updateExpression fName expr)
      in (updateID fName (Assign id newexpr))
-updateStmtUses fName (Kuifje.Syntax.While e s) = 
-     (Kuifje.Syntax.While (updateExpression fName e) (updateStmtUses fName s)) 
+updateStmtUses fName (Kuifje.Syntax.While e s) =
+     (Kuifje.Syntax.While (updateExpression fName e) (updateStmtUses fName s))
 updateStmtUses fName (Kuifje.Syntax.If e s1 s2) =
      (Kuifje.Syntax.If (updateExpression fName e) (updateStmtUses fName s1) (updateStmtUses fName s2))
 updateStmtUses fName (Leak e) = (Leak (updateExpression fName e))
@@ -371,14 +375,15 @@ updateStmtUses fName (Echoice s1 s2 p) =
 updateStmtUses fName (Sampling id expr) =
      let newexpr = (updateExpression fName expr)
      in (updateID fName (Sampling id newexpr))
-updateStmtUses fName (Support id expr) =       
+updateStmtUses fName (Support id expr) =
      let newexpr = (updateExpression fName expr)
      in (updateID fName (Support id newexpr))
 updateStmtUses fName (For var (Var idSet) body) =
      let newBody = (updateStmtUses fName body)
          newIdSet = (updateExpression fName (Var idSet))
      in (updateID fName (For var newIdSet newBody))
-updateStmtUses fName stmt = stmt
+updateStmtUses fName (Assume e) = (Assume (updateExpression fName e))
+-- updateStmtUses fName stmt = stmt
 
 fromJust :: Maybe (Stmt, [String], [Expr]) -> (Stmt, [String], [Expr])
 fromJust (Just a) = a

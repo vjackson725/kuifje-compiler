@@ -20,10 +20,11 @@ import qualified Data.Set as DSET
 import Numeric
 
 import Language.Kuifje.Distribution
---import Kuifje.PrettyPrint 
+--import Kuifje.PrettyPrint
 import Language.Kuifje.PrettyPrint 
 import Language.Kuifje.Semantics
-import Language.Kuifje.Syntax
+import Language.Kuifje.Syntax (Kuifje)
+import qualified Language.Kuifje.Syntax as KS
 import Control.Applicative
 
 import System.IO 
@@ -156,7 +157,8 @@ translateExecKuifje (For index ls body) fBody fCntx list =
             monadList = concatMonadValues preCond (W cond lBody)
          in (monadList, newFBody, newFCntx)
 -- Skip Statements
-translateExecKuifje Kuifje.Syntax.Skip fBody fCntx list = ((concatMonadValues list (M skip)), fBody, fCntx)
+translateExecKuifje Kuifje.Syntax.Skip fBody fCntx list =
+  ((concatMonadValues list (M KS.skip)), fBody, fCntx)
 -- Leak Statements
 translateExecKuifje (Leak e) fBody fCntx list = ((concatMonadValues list (O e)), fBody, fCntx)
 -- Vis Statements
@@ -180,6 +182,8 @@ translateExecKuifje (Sampling id exprD) fBody fCntx list =
             newFCntx = Map.insert id expr fCntx
             monadList = concatMonadValues list (A id expr)
          in (monadList, fBody, newFCntx)
+-- Assume Statements
+translateExecKuifje (Assume e) fBody fCntx list = ((concatMonadValues list (Assm e)), fBody, fCntx)
 -- Default Value - Case a Statement is not found
 translateExecKuifje stmt _ _ list = error ("Invalid Statement:\n" ++ (show stmt) ++ "\nList:\n" ++ (monadType list))
 

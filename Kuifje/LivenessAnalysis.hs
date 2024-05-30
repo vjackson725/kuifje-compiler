@@ -66,6 +66,8 @@ livenessAnalysis (W e b) vars =
         let eVal = (checkListInMap vars (recoverVars e []))
             (bVal, bVars) = livenessAnalysis b vars
          in ((eVal && bVal), vars)
+livenessAnalysis (Assm e) vars =
+    ((checkListInMap vars (recoverVars e [])),vars)
 
 runLivenessAnalysis :: MonadValue -> Bool
 runLivenessAnalysis m = if (fst (livenessAnalysis m Map.empty)) == False
