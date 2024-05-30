@@ -99,9 +99,14 @@ cOperatorWarpper op v1 v2 =
 cOperator op d1 d2 =
   D $ fromListWith (+) [((B (cOperatorWarpper op x y)), p * q) | (x, p) <- toList $ runD d1,
                                                                  (y, q) <- toList $ runD d2]
-bOperator op d1 d2 = 
-  D $ fromListWith (+) [((B (op x y)), p * q) | (B x, p) <- toList $ runD d1,
-                                                (B y, q) <- toList $ runD d2]
+bOperator op d1 d2 =
+  let vs1 = toList $ runD d1
+      vs2 = toList $ runD d2
+  in if all (isBool . fst) vs1 && all (isBool . fst) vs1
+     then
+      D $ fromListWith (+) [((B (op x y)), p * q) | (B x, p) <- vs1,
+                                                    (B y, q) <- vs2]
+     else error "Args to boolean operation were not boolean."
 
 createSetList [] = []
 createSetList ls =
