@@ -3,7 +3,9 @@
 //
 // The expression level if statement was interpreted in a way that destroyed
 // all variables.
-// 
+//
+// The trick with this file is that && is higher precedence than ==. Thus the
+// comparison is ill-typed.
 
 p = False;
 t1 = 0;
