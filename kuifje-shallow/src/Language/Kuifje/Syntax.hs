@@ -18,6 +18,7 @@ data Kuifje s where
   If :: (s ~> Bool) -> Kuifje s -> Kuifje s -> Kuifje s -> Kuifje s
   While :: (s ~> Bool) -> Kuifje s -> Kuifje s -> Kuifje s
   Observe :: Ord o => (s ~> o) -> Kuifje s -> Kuifje s
+  Assume :: (s ~> Bool) -> Kuifje s -> Kuifje s
 
 instance Show s => Show (Kuifje s) where
   show Skip = "Skip"
@@ -25,6 +26,7 @@ instance Show s => Show (Kuifje s) where
   show (If _ astt astf k) = "If <test> (" ++ show astt ++ ") (" ++ show astf ++ ") Fi; " ++ show k
   show (While _ ast k) = "While <test> (" ++ show ast ++ ") Done; " ++ show k
   show (Observe _ k) = "Observe <fun>; " ++ show k
+  show (Assume _ k) = "Assume <fun>; " ++ show k
 
 instance Semigroup (Kuifje s) where
   Skip        <> k = k
@@ -32,6 +34,7 @@ instance Semigroup (Kuifje s) where
   While c p q <> k = While c p (q <> k)
   If c p q r  <> k = If c p q (r <> k)
   Observe f p <> k = Observe f (p <> k)
+  Assume f p <> k = Assume f (p <> k)
 
 instance Monoid (Kuifje s) where
   mempty = Skip
@@ -56,3 +59,7 @@ cond c p q = If c p q skip
 -- | Return an 'Observe' instruction.
 observe :: (Ord o) => (s ~> o) -> Kuifje s
 observe o = Observe o skip
+
+-- | Return an 'Assume' instruction.
+assume :: (s ~> Bool) -> Kuifje s
+assume p = Assume p skip

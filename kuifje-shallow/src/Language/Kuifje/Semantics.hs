@@ -40,6 +40,9 @@ hysem (If c p q r)  = conditional c (hysem p) (hysem q) ==> hysem r
 hysem (While c p q) = let wh = conditional c (hysem p ==> wh) (hysem q)
                       in wh
 hysem (Observe f p) = hobsem f ==> hysem p
+hysem (Assume f p) =
+  assumesem f ==>
+  hysem p
 
 -- | Conditional semantics ('If' and 'While').
 conditional :: forall s. (Ord s) => (s ~> Bool) -> (s ~~> s) -> (s ~~> s) -> (s ~~> s)
@@ -88,6 +91,15 @@ hobsem f = multiply . toPair . (=>> obsem f)
 
     multiply :: (Dist o, o -> Dist s) -> Hyper s
     multiply (d, f') = D.fmapDist f' d
+
+-- | 'Assume' semantics.
+assumesem :: forall s. (Ord s) => (s ~> Bool) -> (s ~~> s)
+assumesem f ds =
+    let dbs :: Dist (Bool, s)
+        dbs = ds =>> (\x -> D.fmapDist (,x) (f x))
+        ds' :: Dist s
+        ds' = D.conditionMaybeDist (\(b,s) -> if b then Just s else Nothing) dbs
+    in D.point ds'
 
 -- | Calculate Bayes Vulnerability for a distribution.
 bayesVuln :: Ord a => Dist a -> Prob
