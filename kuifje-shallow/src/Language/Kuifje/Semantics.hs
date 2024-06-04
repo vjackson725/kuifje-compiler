@@ -112,4 +112,4 @@ condEntropy e m = average (D.fmapDist e m)
 
 -- | Average a distribution of Rationals.
 average :: Dist Rational -> Rational
-average = sum . M.mapWithKey (*) . runD
+average = sum . M.mapWithKey (\a b -> a * D.probToRational b) . runD

@@ -13,7 +13,7 @@ import Text.Printf (printf)
 import qualified Text.PrettyPrint.Boxes as PP
 import Numeric
 
-import Language.Kuifje.Distribution (Dist, unpackD)
+import Language.Kuifje.Distribution (Prob, theProb, Dist, unpackD)
 import Language.Kuifje.ShallowConsts (decimalPrecision)
 
 
@@ -33,13 +33,18 @@ instance Boxable Int where
 instance Boxable Double where
   toBox = PP.text . printf ("%." ++ show decimalPrecision ++ "f")
 
+rationalPrettyFormat :: Rational -> String
 rationalPrettyFormat =
   if decimalPrecision < 0
   then show
-  else printf ("%." ++ show decimalPrecision ++ "f") . (fromRat :: _ -> Double)
+  else printf ("%." ++ show decimalPrecision ++ "f")
+        . (fromRat :: Rational -> Double)
 
 instance Boxable Rational where
   toBox = PP.text . rationalPrettyFormat
+
+instance Boxable Prob where
+  toBox = PP.text . rationalPrettyFormat . theProb
 
 instance Boxable a => Boxable [a] where
   toBox xs =

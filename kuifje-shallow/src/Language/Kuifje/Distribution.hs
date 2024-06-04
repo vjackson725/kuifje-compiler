@@ -4,6 +4,7 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Language.Kuifje.Distribution where
 
@@ -12,16 +13,24 @@ import Data.Bifunctor (first)
 import Data.List (genericLength)
 import Data.Map.Strict (Map)
 import Data.Maybe (mapMaybe)
+import Numeric (fromRat)
 
 -- | Type synonym for probabilities.
-type Prob = Rational
+newtype Prob = Prob { theProb :: Rational }
+  deriving (Eq, Ord, Show, Num, Fractional)
+
+probToRational :: Prob -> Rational
+probToRational = theProb
+
+probToReal :: RealFloat a => Prob -> a
+probToReal = fromRat . theProb
 
 
 -- | List of values with probabilities.
 --   Probabilities should be in (0,1].
 --   Values may be duplicated.
 newtype ProbList a = ProbList { unProbList :: [(a,Prob)] }
-  deriving (Show)
+  deriving (Eq, Show)
 
 -- if f is not injective, values can become duplicated
 instance Functor ProbList where
@@ -132,6 +141,14 @@ empty = D $ M.empty
 -- | Top-level bind function for distributions.
 bindDist :: (Ord b) => Dist a -> (a -> Dist b) -> Dist b
 bindDist d f = normalise $ probListToDist $ (>>=) (distToProbList d) (distToProbList . f)
+
+-- | Double bind for distributions
+bind2Dist :: (Ord c) => Dist a -> Dist b -> (a -> b -> Dist c) -> Dist c
+bind2Dist d1 d2 f = bindDist d1 (\x -> bindDist d2 (f x))
+
+-- | Double fmap for distributions
+fmap2Dist :: (Ord c) => (a -> b -> c) -> Dist a -> Dist b ->  Dist c
+fmap2Dist f d1 d2 = bindDist d1 (\x -> fmapDist (f x) d2)
 
 -- | Top-level join function for distributions.
 joinDist :: (Ord a) => Dist (Dist a) -> Dist a
