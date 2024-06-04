@@ -106,7 +106,7 @@ translateExecKuifje (Support id (Var idexp)) fBody fCntx list =
             executed = exec idexp kuifje
             support = getSupportFromHyper executed
             dist = recoverSupportAsDistList support
-         in if ((length dist) == 1)
+         in if length dist == 1
             then let setExpr = valueToExpr (snd (convertTuple (head dist)))
                      (newRes, newFBody, newFCntx) = translateExecKuifje (Assign id setExpr) fBody fCntx list
                   in (newRes, newFBody, newFCntx)

@@ -139,7 +139,7 @@ exprToValue (IchoiceDist e1 e2 p) =
        v2 = exprToValue e2
        (R r) = exprToValue p
        p2 = (1 - r)
-       list = [(r, v1), (p2, v2)]
+       list = [(Prob r, v1), (Prob p2, v2)]
     in (PD (S.fromDistinctAscList list))
 exprToValue e = error ("Expression cannot be converted to value:\n" ++ (show e))
 

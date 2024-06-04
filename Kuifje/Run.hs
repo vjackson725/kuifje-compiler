@@ -83,7 +83,7 @@ outputL ls =
       putStrLn $ "> Variable " ++ fst l ++ " hyper"
       PP.printBox . toBox . snd $ l
       putStrLn $ "> condEntropy bayesVuln " ++ fst l ++ " hyper"
-      PP.printBox . toBox . condEntropy bayesVuln . snd $ l
+      PP.printBox . toBox . condEntropy (D.probToRational . bayesVuln) . snd $ l
       putStrLn ""
   ) ls
 

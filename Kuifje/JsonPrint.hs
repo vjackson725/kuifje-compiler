@@ -57,7 +57,7 @@ recoverD2FromList :: Integer -> [(Value, Prob)] -> String
 recoverD2FromList s [] = ""
 recoverD2FromList s ls = let (v, p) = (head ls)
                              val = "\"" ++ (recoverValues v) ++ "\""
-                             prob = "\"" ++ (show (fromRat p)) ++ "\""
+                             prob = "\"" ++ (show (probToReal p)) ++ "\""
                              tl = recoverD2FromList s (tail ls)
                           in if tl /= "" 
                              then (spaceGen s) ++ val ++ ":" ++ prob ++ ",\n" ++ tl
@@ -73,7 +73,7 @@ recoverD1FromList s id ls = let ((D hdl), p) = (head ls)
                                 h2 = h1 ++ (spaceGen (s + 4)) ++ "\"type\":\"Inner\",\n"
                                 h3 = h2 ++ hd ++ "\n" ++ (spaceGen s) ++ "}"
                                 p1 = (spaceGen (s + 4)) ++ "\"world " ++ (show id) ++ "\":"
-                                p2 = p1 ++ "\"" ++ (show (fromRat p)) ++ "\""
+                                p2 = p1 ++ "\"" ++ (show (probToReal p)) ++ "\""
                              in if tl /= ""
                                 then ((h3 ++ ",\n" ++ tl), (p2 ++ ",\n" ++ tlp))
                                 else (h3, p2)
@@ -174,7 +174,7 @@ convertListToString ls = let hd = "\"" ++ (head ls) ++ "\""
 
 convertProbListToString :: [Prob] -> String
 convertProbListToString [] = ""
-convertProbListToString ls = let hd = "\"" ++ (show (fromRat (head ls))) ++ "\""
+convertProbListToString ls = let hd = "\"" ++ (show (probToReal (head ls))) ++ "\""
                                  tl = convertProbListToString (tail ls)
                               in if tl /= ""
                                  then hd ++ ", " ++ tl

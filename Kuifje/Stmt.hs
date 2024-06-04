@@ -13,7 +13,7 @@ import Kuifje.Expr
 import Control.Lens hiding (Profunctor)
 import Data.Semigroup
 import Data.Ratio
-import Data.Map.Strict
+import qualified Data.Map.Strict as M
 import Data.List
 import qualified Data.Set as DSET
 import Numeric
@@ -30,7 +30,7 @@ import System.IO
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
 
-valuesToExprList :: [(Value, Rational)] -> [Expr]
+valuesToExprList :: [(Value, Prob)] -> [Expr]
 valuesToExprList [] = []
 valuesToExprList ls =
         let hd = head ls
@@ -38,40 +38,32 @@ valuesToExprList ls =
             tl = valuesToExprList (tail ls)
          in exp : tl
 
-getSupportList :: [(Dist Value)] -> [Expr]
+getSupportList :: [Dist Value] -> [Expr]
 getSupportList [] = []
 getSupportList ls =
-        let hd = assocs (unpackD (head ls))
+        let hd = M.assocs (unpackD (head ls))
             newHd = valuesToExprList hd
             tl = getSupportList (tail ls)
          in newHd ++ tl
 
-getSupportDist :: [((Dist Value), Rational)] -> [(Expr, Rational)]
+getSupportDist :: [(Dist Value, Prob)] -> [(Expr, Prob)]
 getSupportDist [] = []
 getSupportDist ls =
         let hd = head ls
-            exp = valuesToExprList (assocs (unpackD (fst hd)))
-            newExp = (Eset (DSET.fromList exp))
+            exp = valuesToExprList . M.assocs . unpackD . fst $ hd
+            newExp = Eset (DSET.fromList exp)
             prob = snd hd
             tl = getSupportDist (tail ls)
-         --in (newExp, prob) : tl
          in if length exp == 1
-            then ((head exp), prob) : tl
+            then (head exp, prob) : tl
             else (newExp, prob) : tl
 
-getSupportFromHyper :: Dist (Dist Value) -> [(Expr, Rational)]
-getSupportFromHyper d =
-        let mp = unpackD d
-         in getSupportDist (assocs mp)
+getSupportFromHyper :: Dist (Dist Value) -> [(Expr, Prob)]
+getSupportFromHyper d = getSupportDist . M.assocs . unpackD $ d
 
-recoverSupportAsDistList :: [(Expr, Rational)] -> [Expr]
-recoverSupportAsDistList [] = []
-recoverSupportAsDistList ls =
-        let (e, r) = (head ls)
-            p = (RationalConst r)
-            tp = (Tuple e p)
-            tl = recoverSupportAsDistList (tail ls)
-          in tp : tl
+recoverSupportAsDistList :: [(Expr, Prob)] -> [Expr]
+recoverSupportAsDistList ds =
+    map (\(e,p) -> Tuple e (RationalConst (probToRational p))) ds
 
 getFromDist g s | Just x <- E.lookup g s = x
                 | otherwise = error ("Not going to happend " ++ s)

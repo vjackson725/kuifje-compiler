@@ -12,7 +12,7 @@ import Control.Applicative
 import Control.Lens hiding (Profunctor)
 import Data.List
 import qualified Data.Map as Map
-import Data.Map.Strict
+import qualified Data.Map.Strict as MS
 import Data.Ratio
 import Data.Semigroup
 import qualified Data.Set as DSET
@@ -21,7 +21,9 @@ import System.IO
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
 
-import Language.Kuifje.Distribution
+import Language.Kuifje.Distribution (Prob(Prob), Dist(D), runD, unpackD,
+  fmapDist, returnDist, bindDist, joinDist, bernoulli)
+import qualified Language.Kuifje.Distribution as D
 import Language.Kuifje.PrettyPrint 
 import Language.Kuifje.Semantics
 import Language.Kuifje.Syntax
@@ -30,7 +32,10 @@ import Language.Kuifje.Syntax
 (*^*) :: (RealFrac a, RealFrac b) => a -> b -> a
 x *^* y = realToFrac $ realToFrac x ** realToFrac y
 
-aOperatorWarpper op (R x) (R y) = 
+aOperator :: ABinOp -> Dist Value -> Dist Value -> Dist Value
+aOperator op d1 d2 = D.fmap2Dist helper d1 d2
+  where
+    helper (R x) (R y) =
         case op of 
           Add      -> R $ (+) x y
           Subtract -> R $ (-) x y
@@ -39,73 +44,55 @@ aOperatorWarpper op (R x) (R y) =
           Pow      -> R $ x *^* y 
           IDivide  -> R $ (div (truncate x) (truncate y)) % 1
           Rem      -> R $ (rem (truncate x) (truncate y)) % 1
-
-aOperatorWarpper op (T x) (S y) =
+    helper (T x) (S y) =
         case op of
           Filter    -> S $ DSET.filter (\n -> if (isText n)
                                               then let (T v) = n
                                                     in isSubsequenceOf x v
                                               else False) y
           otherwise -> error "Unknow set operation"
-
-aOperatorWarpper op (R x) (S y) =
+    helper (R x) (S y) =
         case op of
-          Filter    -> S $ DSET.filter (\n -> if (isRational n)
-                                              then let (R v) = n
-                                                    in (x == v)
-                                              else False) y
+          Filter    -> S $ DSET.filter (\n -> isRational n && (x == theRational n)) y
           otherwise -> error "Unknow set operation"
-
-aOperatorWarpper op (B x) (S y) =
+    helper (B x) (S y) =
         case op of
-          Filter    -> S $ DSET.filter (\n -> if (isBool n)
-                                              then let (B v) = n
-                                                    in (x == v)
-                                              else False) y
+          Filter    -> S $ DSET.filter (\n -> isBool n && (x == theBool n)) y
           otherwise -> error "Unknow set operation"
-
-aOperatorWarpper op (S x) (S y) = 
+    helper (S x) (S y) = 
         case op of 
           Add      -> S $ DSET.union x y
-          Subtract -> let el = x DSET.\\ y
-                       in S $ el
+          Subtract -> S $ x DSET.\\ y
           Intersection -> S $ DSET.intersection x y
           Filter    -> S $ DSET.filter (\n -> if (isSet n)
                                               then let (S v) = n
                                                     in DSET.isSubsetOf x v
                                               else False) y
           otherwise -> error "Unknow set operation"
+    helper a b =
+      error ("Unknow operation " ++ (show op) ++ " <> " ++ (show a) ++ " <> " ++ (show b))
 
-aOperatorWarpper op a b = error ("Unknow operation " ++ (show op) ++ " <> " ++ (show a) ++ " <> " ++ (show b))
+cOperator :: RBinOp -> Dist Value -> Dist Value -> Dist Value
+cOperator op d1 d2 = D.fmap2Dist (\x y -> B (wrapper op x y)) d1 d2
+  where
+    wrapper Lt (R x) (R y) = (x < y)
+    wrapper Gt (R x) (R y) = (x > y)
+    wrapper Le (R x) (R y) = (x <= y)
+    wrapper Ge (R x) (R y) = (x >= y)
+    wrapper Eq (R x) (R y) = (x == y)
+    wrapper Ne (R x) (R y) = (x /= y)
+    wrapper IsSubstrOf (T x) (T y) = (isSubsequenceOf x y)
+    wrapper Eq (T x) (T y) = ((isInfixOf x y) && (isInfixOf y x))
+    wrapper Ne (T x) (T y) = (not ((isInfixOf x y) && (isInfixOf y x)))
+    wrapper op v1 v2 =
+      error ("Operator: " ++ show op ++ " not found for " ++ valuePrettyType v1 ++ " vs. " ++ valuePrettyType v2)
 
-aOperator op d1 d2 = 
-  D $ fromListWith (+) [((aOperatorWarpper op x y), p * q) | (x, p) <- toList $ runD d1,
-                                                             (y, q) <- toList $ runD d2]
-
-cOperatorWarpper Lt (R x) (R y) = (x < y)
-cOperatorWarpper Gt (R x) (R y) = (x > y)
-cOperatorWarpper Le (R x) (R y) = (x <= y)
-cOperatorWarpper Ge (R x) (R y) = (x >= y)
-cOperatorWarpper Eq (R x) (R y) = (x == y)
-cOperatorWarpper Ne (R x) (R y) = (x /= y)
-
-cOperatorWarpper IsSubstrOf (T x) (T y) = (isSubsequenceOf x y)
-cOperatorWarpper Eq (T x) (T y) = ((isInfixOf x y) && (isInfixOf y x))
-cOperatorWarpper Ne (T x) (T y) = (not ((isInfixOf x y) && (isInfixOf y x)))
-
-cOperatorWarpper op v1 v2 =
-  error ("Operator: " ++ show op ++ " not found for " ++ valuePrettyType v1 ++ " vs. " ++ valuePrettyType v2)
-
-cOperator op d1 d2 =
-  D $ fromListWith (+) [((B (cOperatorWarpper op x y)), p * q) | (x, p) <- toList $ runD d1,
-                                                                 (y, q) <- toList $ runD d2]
+bOperator :: (Bool -> Bool -> Bool) -> Dist Value -> Dist Value -> Dist Value
 bOperator op d1 d2 =
-  let vs1 = toList $ runD d1
-      vs2 = toList $ runD d2
+  let vs1 = MS.toList $ runD d1
+      vs2 = MS.toList $ runD d2
   in if all (isBool . fst) vs1 && all (isBool . fst) vs1
-     then
-      D $ fromListWith (+) [((B (op x y)), p * q) | (B x, p) <- vs1,
-                                                    (B y, q) <- vs2]
+     then D.fmap2Dist (\x y -> B (op (theBool x) (theBool y))) d1 d2
      else error "Args to boolean operation were not boolean."
 
 createSetList [] = []
@@ -114,11 +101,9 @@ createSetList ls =
       tl = createSetList (tail ls)
    in (S hd) : tl
 
-setValueWarpper (S x) = (S (DSET.fromList (createSetList (DSET.elems (DSET.powerSet x)))))
--- DSET.powerSet x
-
-sOperatorPowerSet d1 =
-  D $ fromListWith (+) [((setValueWarpper x), p) | (x, p) <- toList $ runD d1]
+sOperatorPowerSet = fmapDist wrapper
+  where
+    wrapper = S . DSET.fromList . createSetList . DSET.elems . DSET.powerSet . theSet
 
 sBinOperatorWrapper op (S x) (S y) =
   case op of
@@ -137,9 +122,14 @@ sBinOperatorWrapper op x y =
     NIn      -> (x /= y)
     otherwise -> error "Unknow set membership operation"
 
+sBinOperator :: SBinOp -> Dist Value -> Dist Value -> Dist Value
 sBinOperator op d1 d2 =
-  D $ fromListWith (+) [((B (sBinOperatorWrapper op x y)), p * q) | (x, p) <- toList $ runD d1,
-                                                                    (y, q) <- toList $ runD d2]
+  bindDist d1 (\x ->
+    fmapDist (\y ->
+      B (sBinOperatorWrapper op x y)
+    ) d2
+  )
+
 updateProbs :: [(Prob, Value)] -> Prob -> [(Prob, Value)]
 updateProbs [] _ = []
 updateProbs ls p = let hd = head ls
@@ -215,37 +205,37 @@ lenghtFromList ls = (1 + (lenghtFromList (tail ls)))
 
 exprToValue2Cntx :: Expr -> (Dist Value) -> (Dist Value) -> Value
 exprToValue2Cntx (ListExtend id list) ev1 ev2 = 
-  let ls1 = fst (head (assocs (unpackD ev1)))
+  let ls1 = fst . head . MS.assocs $ unpackD ev1
       el1 = extractFromListTy ls1
-      ls2 = fst (head (assocs (unpackD ev2)))
+      ls2 = fst . head . MS.assocs $ unpackD ev2
       el2 = extractFromListTy ls2
       newL = el1 ++ el2
    in (LS newL)
 exprToValue2Cntx (ListElem lsid index) ev1 ev2 =
-  let ls = fst (head (assocs (unpackD ev1)))
-      ind = fst (head (assocs (unpackD ev2)))
+  let ls = fst . head . MS.assocs $ unpackD ev1
+      ind = fst . head . MS.assocs $ unpackD ev2
       elems = extractFromListTy ls
    in if (isRational ind)
       then let (R id) = ind
             in recoverElemFromList elems (numerator id)
       else error ("Out of range access index in list: " ++ (show lsid)) 
 exprToValue2Cntx (ListElemDirect list index) ev1 ev2 =
-  let ls = fst (head (assocs (unpackD ev1)))
-      ind = fst (head (assocs (unpackD ev2)))
+  let ls = fst . head . MS.assocs $ unpackD ev1
+      ind = fst . head . MS.assocs $ unpackD ev2
       elems = extractFromListTy ls
    in if (isRational ind)
       then let (R id) = ind
             in recoverElemFromList elems (numerator id)
       else error ("Out of range access index in list: " ++ (show list))
 exprToValue2Cntx (ListAppend id elem) ev1 ev2 =
-  let ls = fst (head (assocs (unpackD ev1)))
-      el = fst (head (assocs (unpackD ev2)))
+  let ls = fst . head . MS.assocs $ unpackD ev1
+      el = fst . head . MS.assocs $ unpackD ev2
       elems = extractFromListTy ls
       newL = elems ++ [el]
    in (LS newL)
 exprToValue2Cntx (ListInsert id index elem) ev1 ev2 =
-  let ls = fst (head (assocs (unpackD ev1)))
-      el = fst (head (assocs (unpackD ev2)))
+  let ls = fst . head . MS.assocs $ unpackD ev1
+      el = fst . head . MS.assocs $ unpackD ev2
       elems = extractFromListTy ls
       id = exprToValue index ev1
    in if (isRational id)
@@ -277,13 +267,13 @@ exprToValue (IchoiceDist e1 e2 p) ev =
        v2 = exprToValue e2 ev
        (R r) = exprToValue p ev
        p2 = (1 - r)
-       list = [(r, v1), (p2, v2)]
+       list = [(Prob r, v1), (Prob p2, v2)]
     in (PD (DSET.fromDistinctAscList list))
 exprToValue (ListExpr ls) ev =
   let l = lExprTolValues ls ev
    in (LS l)
 exprToValue (ListInsert id index elem) ev =
-  let ls = fst (head (assocs (unpackD ev)))
+  let ls = fst . head . MS.assocs $ unpackD ev
       elems = extractFromListTy ls
       el = exprToValue elem ev
       id = exprToValue index ev
@@ -293,13 +283,13 @@ exprToValue (ListInsert id index elem) ev =
                in (LS newL)
          else error ("Invalid index" ++ (show index))
 exprToValue (ListRemove id elem) ev =
-  let ls = fst (head (assocs (unpackD ev)))
+  let ls = fst . head . MS.assocs $ unpackD ev
       elems = extractFromListTy ls
       el = exprToValue elem ev
       newL = removeElemFromList elems el False
    in (LS newL)
 exprToValue (ListLength list) ev =
-  let ls = fst (head (assocs (unpackD ev)))
+  let ls = fst . head . MS.assocs $ unpackD ev
       elems = extractFromListTy ls
       r = lenghtFromList elems
    in (R (r % 1))
@@ -325,7 +315,7 @@ convertTuple :: Expr -> (Prob, Value)
 convertTuple (Tuple e p) = let ev = (evalE (RationalConst (0 % 1))) E.empty
                                val = exprToValue e ev
                                (R pr) = exprToValue p ev
-                            in (pr, val)
+                            in (Prob pr, val)
 
 convertINUlist :: [Expr] -> [(Prob, Value)]
 convertINUlist [] = []
@@ -337,7 +327,7 @@ convertDistListToExprList :: [(Prob, Value)] -> [Expr]
 convertDistListToExprList [] = []
 convertDistListToExprList ls = let (p, v) = head ls
                                    newE = valueToExpr v
-                                   newP = valueToExpr (R p)
+                                   newP = valueToExpr (R . D.probToRational $ p)
                                    tl = convertDistListToExprList (tail ls)
                                    tuple = (Tuple newE newP)
                                 in tuple : tl
@@ -437,27 +427,28 @@ evalE (ExprIf cond e1 e2) = \s ->
         let cond' = runD $ (evalE cond) s
             e1' = (evalE e1) s
             e2' = (evalE e2) s 
-            d1 = case Data.Map.Strict.lookup (B True) cond' of 
-                   (Just p)  -> D $ Data.Map.Strict.map (*p) $ runD e1'
-                   otherwise -> D $ Data.Map.Strict.empty
-            d2 = case Data.Map.Strict.lookup (B False) cond' of 
-                   (Just p)  -> D $ Data.Map.Strict.map (*p) $ runD e2'
-                   otherwise -> D $ Data.Map.Strict.empty
-         in D $ unionWith (+) (runD d1) (runD d2)
+            d1 = case MS.lookup (B True) cond' of 
+                   (Just p)  -> D $ MS.map (*p) $ runD e1'
+                   otherwise -> D $ MS.empty
+            d2 = case MS.lookup (B False) cond' of 
+                   Just p    -> D $ MS.map (*p) $ runD e2'
+                   otherwise -> D $ MS.empty
+         in D $ MS.unionWith (+) (runD d1) (runD d2)
 evalE (ABinary op e1 e2) = \s -> 
   let e1' = (evalE e1) s
       e2' = (evalE e2) s 
    in aOperator op e1' e2' 
-evalE (Ichoice e1 e2 p) = \s -> 
-  let e1' = (evalE e1) s
-      e2' = (evalE e2) s 
-      p'  = Data.List.foldr (\x y -> case x of (R x', q) -> x'*q*y) 1 
-              $ toList $ runD $ (evalE p ) s
-      d1 = D $ Data.Map.Strict.map (*p') $ runD e1'
-      d2 = D $ Data.Map.Strict.map (*(1-p')) $ runD e2'
-   in D $ unionWith (+) (runD d1) (runD d2)
+evalE (Ichoice e1 e2 pd) = \s -> 
+  let e1' = evalE e1 s
+      e2' = evalE e2 s
+      pd' = evalE pd s
+      p'  = Data.List.foldr (\x y -> case x of (R x', q) -> x' * D.probToRational q * y) 1
+              . MS.toList . runD $ pd'
+      d1 = D . MS.map (* Prob p') $ runD e1'
+      d2 = D . MS.map (* Prob (1-p')) $ runD e2'
+   in D $ MS.unionWith (+) (runD d1) (runD d2)
 evalE (IchoiceDist e1 e2 p) = \s ->
-  let dw = fmapDist theRational $ evalE p s
+  let dw = fmapDist (Prob . theRational) $ evalE p s
    in bindDist dw (joinDist . bernoulli (evalE e1 s) (evalE e2 s))
 evalE (Ichoices ls) = 
    if length ls == 1 
@@ -467,17 +458,16 @@ evalE (Ichoices ls) =
                           (Ichoices (tail ls)) 
                           (RationalConst (1 % (toInteger (length ls))))
 evalE (IchoicesDist ls) = \s -> 
-   let ev = (evalE (Ichoices ls)) s
-       p = (1 % (toInteger (length ls)))
+   let ev = evalE (Ichoices ls) s
+       p = Prob (1 % toInteger (length ls))
        vals = createDistList p ls ev
-       dist = (PD (DSET.fromDistinctAscList vals))
+       dist = PD (DSET.fromDistinctAscList vals)
     in returnDist dist
 evalE (Tuple e p) = \s ->
-  let e' = (evalE e) s
-      p' = Data.List.foldr (\x y -> case x of (R x', q) -> x'*q*y) 1
-              $ toList $ runD $ (evalE p) s
-      d = D $ Data.Map.Strict.map (*p') $ runD e'
-   in D $ (runD d)
+  let e' = evalE e s
+      p' = Data.List.foldr (\x y -> case x of (R x', q) -> x' * D.probToRational q * y) 1
+              . MS.toList . runD . evalE p $ s
+   in D . MS.map (* Prob p') $ runD e'
 evalE (INUchoices ls) =
   if (evalTList $ INUchoices ls) == 1.0
      then evalNUList $ INUchoices ls
@@ -501,21 +491,21 @@ evalE (Not b) = \s ->
          in (fmapDist (\bv -> case bv of 
                             (B b') -> B (not b'))) r'
 evalE (SBinary op e1 e2) = \s ->
-  let e1' = (evalE e1) s
-      e2' = (evalE e2) s in
-      sBinOperator op e1' e2'
+  let e1' = evalE e1 s
+      e2' = evalE e2 s
+   in sBinOperator op e1' e2'
 evalE (BBinary op e1 e2) = \s -> 
-  let e1' = (evalE e1) s
-      e2' = (evalE e2) s in 
+  let de1' = evalE e1 s
+      de2' = evalE e2 s in 
       case op of 
-        And -> (bOperator (&&) e1' e2') -- /\
-        Or  -> (bOperator (||) e1' e2') -- \/
-evalE (RBinary op e1 e2) = \s -> 
-  let e1' = (evalE e1) s
-      e2' = (evalE e2) s in 
-      cOperator op e1' e2'
-evalE (Eset set) = \s -> 
-        let exprToValue elem = toList (runD ((evalE elem) s))
+        And -> (bOperator (&&) de1' de2') -- /\
+        Or  -> (bOperator (||) de1' de2') -- \/
+evalE (RBinary op e1 e2) = \s ->
+  let e1' = evalE e1 s
+      e2' = evalE e2 s
+   in cOperator op e1' e2'
+evalE (Eset set) = \s ->
+        let exprToValue elem = MS.toList . runD . evalE elem $ s
             distList = Data.List.map exprToValue (DSET.toList set) 
             tmpf2 :: (Value, Prob) -> (Value, Prob) -> (Value, Prob)
             tmpf2 (S a, b) (c, d) = (S (DSET.insert c a), b*d)
@@ -525,20 +515,18 @@ evalE (Eset set) = \s ->
             init = [(S DSET.empty, 1)]
             resultList :: [(Value, Prob)]
             resultList = Data.List.foldr helperFun init distList
-         in D $ fromListWith (+) resultList
+         in D $ MS.fromListWith (+) resultList
 evalE (SetIchoice e) = \s -> 
-        let d = (evalE e) s 
-            resultList = concat [[(elem, p/(toInteger (DSET.size set) % 1)) 
-                                        | elem <- DSET.toList set] 
-                                        | (S set, p) <- toList (runD d)]
-         in D $ fromListWith (+) resultList
+  let d = (evalE e) s 
+      inner s p = [(elem, Prob (p / toRational (DSET.size s))) | elem <- DSET.toList s]
+      resultList = concat [inner s (D.probToRational p) | (S s, p) <- MS.toList (runD d)]
+   in D $ MS.fromListWith (+) resultList
 evalE (SetIchoiceDist e) = \s -> 
-        let d = (evalE e) s
-            resultList = concat [[(p/(toInteger (DSET.size set) % 1), elem)
-                                        | elem <- DSET.toList set]
-                                        | (S set, p) <- toList (runD d)]
-            dist = (PD (DSET.fromDistinctAscList resultList))
-         in returnDist dist
+  let d = evalE e s
+      inner s p = [(Prob (p / toRational (DSET.size s)), elem) | elem <- DSET.toList s]
+      resultList = concat [inner s (D.probToRational p) | (S s, p) <- MS.toList (runD d)]
+      dist = PD (DSET.fromDistinctAscList resultList)
+   in returnDist dist
 evalE (Geometric alpha low start high) =
          let alphaV = evalTList $ alpha
              lowV = round (evalTList $ low)
@@ -598,8 +586,8 @@ evalE (ListLength list) = \s ->
 --             tl = evalE (TupleExpr (tail list)) s
 --          in D $ fromListWith (+) resultList
 evalE (TupleExpr list) = \s -> 
-        let runAll e = toList (runD ((evalE e) s))
-            distList = Data.List.map runAll list
+        let runAll e = MS.toList (runD ((evalE e) s))
+            distList = map runAll list
             tmpDistToVal :: [(Value, Prob)] -> [Value]
             tmpDistToVal [] = []
             tmpDistToVal ls =
@@ -658,13 +646,10 @@ recoverIChoicesValues (Ichoice v1 v2 _) =
    in hd ++ tl
 recoverIChoicesValues x = error ("Distribution to Value fail to:\n" ++ (show x) ++ "\n\n")
 
-evalNUList (INUchoices ls) =
-  if length ls == 1
-     then evalE $ head ls
-     else \s ->
-        let e1' = (evalE $ head ls) s
-            e2' = (evalNUList $ INUchoices (tail ls)) s
-         in D $ unionWith (+) (runD e1') (runD e2')
+evalNUList :: Expr -> Gamma ~> Value
+evalNUList (INUchoices es) s = D (helper es)
+  where
+    helper = foldr (\e m -> MS.unionWith (+) m (runD (evalE e s))) Map.empty
 
 fromJustExpr :: Maybe Expr -> Expr
 fromJustExpr (Just a) = a
