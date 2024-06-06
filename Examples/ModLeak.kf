@@ -3,7 +3,7 @@ x <- uniform [1..5]
 N = 2;
 
 i = 0;
-while (i < N):
+while i < N:
   m <- uniform [1..4];
   leak (x % m);
   i = i + 1;

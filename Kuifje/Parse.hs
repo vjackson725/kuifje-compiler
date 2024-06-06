@@ -93,6 +93,9 @@ languageDef =
                                       , "!="
                                       , "&&"
                                       , "||"
+                                      , "and"
+                                      , "or"
+                                      , "not"
                                       , "%"
                                       , "@"
                                       , "::"
@@ -366,7 +369,7 @@ vidStmt =
 
 leakStmt :: Parser Stmt
 leakStmt = 
-  do reserved "leak" <|> reserved "observe" -- <|> reserved "print"
+  do reserved "leak" <|> reserved "observe" <|> reserved "print"
      reservedOp "("
      expr <- expression
      reservedOp ")"
@@ -412,8 +415,8 @@ listCallStmt =
 
 expression :: Parser Expr
 expression =
-   buildExpressionParser eOperators eTerm << whiteSpace
-      <?> "expression"
+  buildExpressionParser eOperators eTerm << whiteSpace
+    <?> "expression"
 
 eOperators =
         [ [Prefix (reservedOp "-"   >> return Neg               )          ]
@@ -433,15 +436,18 @@ eOperators =
            Infix  (reservedOp "isSub"  >> return (SBinary IsSubOf)) AssocLeft]
         , [Infix  (reservedOp "&&"  >> return (BBinary And     )) AssocLeft,
            Infix  (reservedOp "||"  >> return (BBinary Or      )) AssocLeft]
-        , [Infix  (kChoice IchoiceDist)                               AssocLeft]
-        , [Infix  (reservedOp ">"   >> return (RBinary Gt)      ) AssocLeft] 
-        , [Infix  (reservedOp "<"   >> return (RBinary Lt)      ) AssocLeft] 
-        , [Infix  (reservedOp ">="  >> return (RBinary Ge)      ) AssocLeft] 
-        , [Infix  (reservedOp "<="  >> return (RBinary Le)      ) AssocLeft] 
-        , [Infix  (reservedOp "=="  >> return (RBinary Eq)      ) AssocLeft] 
-        , [Infix  (reservedOp "!="  >> return (RBinary Ne)      ) AssocLeft]
-        , [Infix  (reservedOp "strIsSub"  >> return (RBinary IsSubstrOf) ) AssocLeft]
-        , [Infix  (reservedOp "@"   >> return Tuple             ) AssocLeft]
+        , [Infix  (kChoice IchoiceDist)                           AssocLeft]
+        , [Infix  (reservedOp ">"   >> return (RBinary Gt))       AssocLeft]
+        , [Infix  (reservedOp "<"   >> return (RBinary Lt))       AssocLeft]
+        , [Infix  (reservedOp ">="  >> return (RBinary Ge))       AssocLeft]
+        , [Infix  (reservedOp "<="  >> return (RBinary Le))       AssocLeft]
+        , [Infix  (reservedOp "=="  >> return (RBinary Eq))       AssocLeft]
+        , [Infix  (reservedOp "!="  >> return (RBinary Ne))       AssocLeft]
+        , [Infix  (reservedOp "strIsSub" >> return (RBinary IsSubstrOf)) AssocLeft]
+        , [Prefix (reservedOp "not" >> return Not)]
+        , [ Infix  (reservedOp "and" >> return (BBinary And))      AssocLeft
+          , Infix  (reservedOp "or"  >> return (BBinary Or))       AssocLeft
+          ]
         ]
 
 eTermR :: Parser Expr
