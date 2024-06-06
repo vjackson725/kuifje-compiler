@@ -6,36 +6,39 @@ An imperative language for quantitative information flow.
 - [GHC](https://www.haskell.org/ghc/) 8.10.4 or later
 - [CABAL](https://www.haskell.org/cabal/) 3.4.0.0 or later
 
-The process was tested on ubuntu 20.04.
+The process was tested on Ubuntu 22.04.4 LTS.
 
 ## Setup
 
-To set up the Kuifje compiler, run the following commands:
-```
+To set up the Kuifje repository, and then build the compiler,
+run the following commands:
+```sh
 git submodule init
 git submodule update
-cabal new-build
+cabal build
 ```
 
-This build process has been checked to run with ghc 8.10.4 and cabal 3.4.0.0.
+This build process has been checked to run with ghc 9.6.2 and cabal 3.6.2.0.
 
 ## Usage
-To run the file, you can use cabal. For example, you can run `Examples\BiasCoin.kf` by using 
-```
-cabal new-run Kuifje-compiler Examples\BiasCoin.kf
+To run the file, you can use cabal. For example, you can run
+`Examples\BiasCoin.kf` by executing the command
+
+```sh
+cabal run -- Kuifje-compiler Examples\BiasCoin.kf
 ```
 
 ## Example
 There are some examples under the drectory of `Examples`
 
 A brief example `Examples\BiasCoin.kf`:
-```c
-p <- uniform [0.3, 0.7];
-i = 0;
+```kf
+p <- uniform [0.3, 0.7]
+i = 0
 while i < 2:
-  result <- 0 [p] 1;
-  leak(result);
-  i = i + 1;
+  result <- 0 [p] 1
+  print(result)
+  i = i + 1
 ```
 
 This example demonstrates that there is a biased coin that you do not know which side bias to. It may 0.7 bias toward the head or 0.3 bias toward the head. By flipping the coin twice and leak the coin flip result, how much information you adversary would know about which way the coin bias toward. 
