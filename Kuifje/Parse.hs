@@ -44,9 +44,9 @@ s << t = do { x <- s; t; return x }
 --
 
 languageDef =
-   emptyDef { Token.commentStart    = "/*"
-            , Token.commentEnd      = "*/"
-            , Token.commentLine     = "//"
+   emptyDef { Token.commentStart    = "#--"
+            , Token.commentEnd      = "--#"
+            , Token.commentLine     = "#"
             , Token.identStart      = letter
             , Token.identLetter     = alphaNum
             , Token.reservedNames   = [ "if"

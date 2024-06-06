@@ -1,6 +1,6 @@
-//
-// While loop with dependent internal p-choice
-//
+#
+# While loop with dependent internal p-choice
+#
 
 N = 2;
 x = -1;

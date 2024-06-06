@@ -1,4 +1,4 @@
-// Initialise sequence A.
+# Initialise sequence A.
 N= 2;
 A= [];
 list= [0, 1];
@@ -6,14 +6,14 @@ for n in list:
   a<- uniform [0, 1];
   A.append(a);
 
-// Search for any occurrence of 0 in A.
+# Search for any occurrence of 0 in A.
 n= 0;
 nn= N;
 while n<N:
   a= A[n];
-//if a==0: 
-//  nn= n; // External choice.
+#if a==0: 
+#  nn= n; // External choice.
   nn= n if a==0 else nn; // Internal choice.
   n= n+1;
 b= (nn!=N);
-// leak(b); // ...whether 0 was there.
+# leak(b); // ...whether 0 was there.

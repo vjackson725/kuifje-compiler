@@ -1,4 +1,4 @@
-// Initialise sequence A.
+# Initialise sequence A.
 A= [];
 list= [0,1,2];
 for n in list:
@@ -6,7 +6,7 @@ for n in list:
   A.append(a);
 N= len(A);
 
-// Search for any occurrence of 0 in A.
+# Search for any occurrence of 0 in A.
 n= 0;
 nn= N;
 while n<N:

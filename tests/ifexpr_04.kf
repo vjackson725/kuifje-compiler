@@ -1,4 +1,4 @@
-// x := if () then 1 else 2;
+# x := if () then 1 else 2;
 
 x <- 0 [1/2] 1;
 y = if x > 0: 2; 

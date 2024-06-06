@@ -1,4 +1,4 @@
-// chosenDoor := 1;
+# chosenDoor := 1;
 chosenDoor <- uniform {1,2,3};
 prizeDoor  <- uniform {1,2,3};
 remain = {1, 2, 3} - {chosenDoor, prizeDoor};

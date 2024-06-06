@@ -1,6 +1,6 @@
-//
-// Test of the and, or, and not expressions.
-//
+#
+# Test of the and, or, and not expressions.
+#
 
 a <- uniform [true, false]
 b <- uniform [true, false]

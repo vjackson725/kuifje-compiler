@@ -1,6 +1,6 @@
-//
-// While loop with dependent internal p-choice
-//
+#
+# While loop with dependent internal p-choice
+#
 
 i = 0
 for x in [1,2,3,4,5]:

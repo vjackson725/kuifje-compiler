@@ -1,4 +1,4 @@
-// Initialise sequence A.
+# Initialise sequence A.
 N = 4;
 A = [];
 list = [0, 1, 2, 3, 4];
@@ -6,7 +6,7 @@ for n in list:
   a <- uniform [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
   A.append(a);
 
-// Search for any occurrence of 0 in A.
+# Search for any occurrence of 0 in A.
 n = 0;
 while ((n < N) && (A[n] != 0)): 
   n = n+1;

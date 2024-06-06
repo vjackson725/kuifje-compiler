@@ -3,7 +3,7 @@ E <- uniform [0..15];
 
 b = B;
 e = E;
-// e = 15;
+# e = 15;
 p = 1;
 while e != 0:
   r = e % 2;

@@ -1,6 +1,6 @@
-//
-// While loop with dependent internal p-choice, using if-expression
-//
+#
+# While loop with dependent internal p-choice, using if-expression
+#
 
 i <- uniform [0,1,2,3,4,5];
 

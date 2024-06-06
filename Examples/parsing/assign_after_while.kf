@@ -1,8 +1,8 @@
-//
-// Assign after a while loop
-//
-// Mostly intended as a test of indented-block parsing
-//
+#
+# Assign after a while loop
+#
+# Mostly intended as a test of indented-block parsing
+#
 
 N = 2;
 i = 0;

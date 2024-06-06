@@ -1,4 +1,4 @@
-// x not declared before its leakage
+# x not declared before its leakage
 p = (1 [1/2] 2);
 prob <- p;
 

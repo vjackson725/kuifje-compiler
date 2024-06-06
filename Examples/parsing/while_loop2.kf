@@ -1,6 +1,6 @@
-//
-// While loop with dependent internal p-choice, using if-expression
-//
+#
+# While loop with dependent internal p-choice, using if-expression
+#
 
 N = 2;
 x2 = -1;
