@@ -1,0 +1,12 @@
+//
+// Test of the and, or, and not expressions.
+//
+
+a <- uniform [true, false]
+b <- uniform [true, false]
+c <- uniform [true, false]
+
+w = a and b
+x = (w, c, a and b or c)
+y = (not a and not b, not (a or b))
+z = (not a or not b, not (a and b))
