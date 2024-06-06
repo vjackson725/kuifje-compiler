@@ -2,10 +2,12 @@ module Kuifje.Value where
 
 import qualified Kuifje.Env as E
 
+import Data.Bifunctor (bimap)
 import Data.List (intercalate)
 import Data.Ratio
 import qualified Data.Set as S
 import Numeric
+import Text.Printf (printf)
 
 import Language.Kuifje.Distribution
 
@@ -13,8 +15,18 @@ import Text.ParserCombinators.Parsec.Expr
 
 valueToString :: Value -> String
 valueToString (R x) = show (fromRat x)
-valueToString (B x) = if x then "TRUE" else "FALSE"
+valueToString (B x) = if x then "True" else "False"
 valueToString (T x) = x
+valueToString (PD xs) =
+  let ds = (map ((\(p,v) -> v ++ "@" ++ p) . bimap show valueToString) (S.toList xs))
+  in printf "[" ++ intercalate ", " ds ++ "]"
+valueToString (LS xs) =
+  printf "[" ++ intercalate ", " (map valueToString xs) ++ "]"
+valueToString (TP xs) =
+  case xs of
+    []  -> "()"
+    [x] -> "(" ++ valueToString x ++ ",)"
+    xs  -> printf "(" ++ intercalate ", " (map valueToString xs) ++ ")"
 
 data Value = R Rational 
            | B Bool 

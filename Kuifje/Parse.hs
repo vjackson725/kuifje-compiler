@@ -19,7 +19,8 @@ import qualified Data.Set as Set
 import System.IO
 
 import Text.ParserCombinators.Parsec (Parser, parse, (<?>), (<|>), eof, sepBy,
-   try, char, lookAhead, skipMany, digit, many, many1, alphaNum, letter,
+   sepEndBy, try, char, lookAhead, skipMany, digit, many, many1, alphaNum,
+   letter,
    setInput, getInput, getPosition, sourceColumn, sourceLine)
 import Text.Parsec (ParsecT, Parsec)
 import Text.ParserCombinators.Parsec.Expr (Assoc(..), Operator(..), buildExpressionParser)
@@ -545,11 +546,9 @@ setExpr =
 
 tupleExpr =
         do reservedOp "("
-           exp <- expression
-           reserved ","
-           list <- sepBy expression (symbol ",")
+           es <- sepEndBy expression (reservedOp ",")
            reservedOp ")"
-           return $ TupleExpr ([exp] ++ list)
+           return $ TupleExpr es
 
 listExpr =
   (do symbol "["

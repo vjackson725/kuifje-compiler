@@ -14,22 +14,6 @@ import Prelude hiding ((<>))
 
 import Kuifje.Env
 
-listToString :: [Value] -> String
-listToString [] = ""
-listToString ls =
-  let hd = valueToString (head ls)
-      tl = tail ls
-      str = (listToString tl)
-   in if hd == [] then str
-      else if tl == [] then hd
-      else (hd ++ "," ++ str)
-
-convertToTupleStr :: (Value) -> String
-convertToTupleStr (TP x) =
-  let str = listToString x
-      newStr = id "(" ++ str ++ ")"
-   in newStr
-
 instance Boxable (Value) where
   toBox (R x) = text "R" <+> text (show $ fromRat x)
   toBox (T x) = text "T" <+> text (show $ x)
@@ -37,7 +21,7 @@ instance Boxable (Value) where
   toBox (S x) = text "S" <+> (toBox $ S.elems x)
   toBox (PD x) = text "PD" <+> (toBox $ S.elems x)
   toBox (LS x) = text "LS" <+> (toBox $ x)
-  toBox (TP x) = text "TP" <+> text (convertToTupleStr (TP x))
+  toBox (TP x) = text "TP" <+> text (valueToString (TP x))
 
 instance Boxable (Env Value) where
   toBox (Env m) =
