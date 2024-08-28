@@ -12,8 +12,8 @@ nn= N;
 while n<N:
   a= A[n];
 #if a==0: 
-#  nn= n; // External choice.
-  nn= n if a==0 else nn; // Internal choice.
+#  nn= n; # External choice.
+  nn= n if a==0 else nn; # Internal choice.
   n= n+1;
 b= (nn!=N);
-# leak(b); // ...whether 0 was there.
+# leak(b); # ...whether 0 was there.

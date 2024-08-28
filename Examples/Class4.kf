@@ -17,4 +17,4 @@ while n<N:
     c = (a, n);
   n= n+1;
 b= (nn==N);
-leak(b); // ...whether 0 was there.
+leak(b); # ...whether 0 was there.

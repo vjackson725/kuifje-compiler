@@ -11,4 +11,4 @@ n = 0;
 while ((n < N) && (A[n] != 0)): 
   n = n+1;
   b = (n==N);
-  leak(b); // ...whether 0 was there.
+  leak(b); # ...whether 0 was there.
