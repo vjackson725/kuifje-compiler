@@ -545,10 +545,13 @@ setExpr =
            return $ Eset values
 
 tupleExpr =
-        do reservedOp "("
-           es <- sepEndBy expression (reservedOp ",")
-           reservedOp ")"
-           return $ TupleExpr es
+  (reservedOp "()" >> return (TupleExpr [])) <|>
+  (do reservedOp "("
+      e <- expression
+      _ <- reservedOp ","
+      es <- sepEndBy expression (reservedOp ",")
+      reservedOp ")"
+      return $ TupleExpr (e:es))
 
 listExpr =
   (do symbol "["
