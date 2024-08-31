@@ -1,0 +1,17 @@
+# UrnPuzzle1.kf
+#
+# Originally from https://x.com/littmath/status/1751648838501224790
+#
+# There are 100 balls in an urn, n (<= 100) of them are red and 100-n of them
+# are green. n is sampled uniformly from the range 0..=100. You remove a ball
+# (without replacement) from the urn; it is red. If you remove another ball
+# from the urn, what is the probability it is red?
+
+n <- uniform [0..100]
+
+pick1 <- "red" [n/100] "green"
+
+assume (pick1 == "red")
+
+pick2 <- "red" [(n-1)/99] "green"
+
