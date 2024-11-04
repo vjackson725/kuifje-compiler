@@ -10,11 +10,8 @@ The process was tested on Ubuntu 22.04.4 LTS.
 
 ## Setup
 
-To set up the Kuifje repository, and then build the compiler,
-run the following commands:
+To build the compiler, run the command:
 ```sh
-git submodule init
-git submodule update
 cabal build
 ```
 
